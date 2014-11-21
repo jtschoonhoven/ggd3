@@ -1,4 +1,6 @@
 ggd3
 ====
 
-A simple, grammar of graphics inspired framework for creating beautiful charts with D3.
+Based on https://github.com/gigamonkey/gg
+
+Just got started. Come back in a couple of weeks and we'll see how things are going.
