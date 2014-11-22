@@ -38,13 +38,22 @@ function Graphic(data, params) {
 // ======
 
 
-function Facets() {}
+function Facets() {
+  this.scale = {};
+  this.scale.x = d3.scale.ordinal();
+  this.scale.y = d3.scale.ordinal();
+  this.setRange = _.noop;
+}
 
 
 function SingleFacet(graphic) {
 
   this.graphic = graphic;
   this.data = [{ key: 'single facet', values: graphic.data }];
+
+  // Scales simply return 0 because there is only one facet.
+  this.scale.x.range([0]);
+  this.scale.y.range([0]);
 
 }
 
@@ -59,9 +68,45 @@ function FlowFacets(graphic) {
   this.graphic = graphic;
   this.field = graphic.params.facets.flow;
 
+  // Nest the data so that facet fields are at the first level
+  // of the object hierarchy.
   this.data = graphic.data = d3.nest()
-    .key(function(row){ return row[that.field] })
+    .key(function(row){ return row[that.field]; })
     .entries(graphic.data);
+
+  // Get the unique facet values from the nested data.
+  // These form the scale domain.
+  var domain = this.data.map(function(facet) { return facet.key; });
+  this.scale.x.domain(domain);
+  this.scale.y.domain(domain);
+
+  // Range depends on the width of the target element and so
+  // can't be computed until render() is called.
+
+  this.setRange = function() {
+
+    var that = this;
+    var width = parseInt(graphic.width);
+    var height = parseInt(graphic.height);
+
+    // Get the ratio of width to height.
+    // Ratio happens to answer the question, "how many
+    // facet columns are there for every facet row?"
+    var aspectRatio = Math.floor(width/height) || 1;
+
+    var rangeX = domain.map(function(d,i) {
+      return domain.length < aspectRatio ? i * (width/domain.length) : (i%aspectRatio) * (width/aspectRatio); 
+    });
+
+    var rangeY = domain.map(function(d,i) { 
+      return Math.floor(i / aspectRatio) * (domain.length/aspectRatio) * height; 
+    });
+
+    this.scale.x.range(rangeX);
+    this.scale.y.range(rangeY); 
+
+  }
+
 
 }
 
@@ -88,18 +133,25 @@ function GridFacets(graphic) {
 GridFacets.prototype = new Facets();
 
 
-
 // ======
 // SCALES
 // ======
 
 
-function Scale() {}
+function Scale() {
+  this.domain;
+  this.range;
+}
 
 
-function CategoricalScale() {
+function CategoricalScale(graphic) {
+
+  this.scale = d3.scale.ordinal();
 
 }
+
+
+CategoricalScale.prototype = new Scale();
 
 
 // ======
@@ -209,7 +261,11 @@ Graphic.prototype.render = function(el, width, height) {
 
 Facets.prototype.render = function() {
 
+  var that = this;
 
+  // Now that the element width is defined we can set
+  // the range of the facet scale.
+  this.setRange();
 
   this.el = this.graphic.el.selectAll('g.facet');
   this.el
@@ -217,7 +273,10 @@ Facets.prototype.render = function() {
     .enter()
     .append('g')
     .attr('class', 'facet')
-    .attr('data-key', function(d) { return d.key; });
+    .attr('data-key', function(d) { return d.key; })
+    .attr('transform', function(d, i) { 
+      return 'translate(' + that.scale.x(d.key) + ',' + that.scale.y(d.key) + ')'; 
+    });
 
 }
 
