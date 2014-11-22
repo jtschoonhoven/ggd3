@@ -4,25 +4,111 @@
 if (!d3 || !_) { throw 'Requires D3 and Underscore.'; }
 
 
-function Graphic(data, opts) {
+// ========
+// GRAPHICS
+// ========
+
+
+function Graphic(data, params) {
+
+  if (!data || !params) { throw 'Graphic initialized without data or parameters'; }
+
+  _.defaults(params || {}, { facets: {},  layers: [] });
 
   this.data = data;
+  this.params = params;
 
-  // Graphic mapping relates a field in the data source to a facet
-  // aesthetic ("flow", "x", or "y"). Most often this will be left
-  // empty and the graphic will render in a single facet (chart).
+  if (params.facets && params.facets.grid) {
+    this.facets = new GridFacets(this);
+  }
 
-  this.mapping = {};
+  else if (params.facets && params.facets.flow) {
+    this.facets = new FlowFacets(this);
+  }
 
-  // Graphic layers primarily consist of charts (which in turn)
-  // contain their own sublayers) and axes.
-
-  this.facets = [];
+  else {
+    this.facets = new SingleFacet(this);
+  }
 
 }
 
 
-function Chart(data, opts) {
+// ======
+// FACETS
+// ======
+
+
+function Facets() {}
+
+
+function SingleFacet(graphic) {
+
+  this.graphic = graphic;
+  this.data = [{ key: 'single facet', values: graphic.data }];
+
+}
+
+
+SingleFacet.prototype = new Facets();
+
+
+function FlowFacets(graphic) {
+
+  var that = this;
+
+  this.graphic = graphic;
+  this.field = graphic.params.facets.flow;
+
+  this.data = graphic.data = d3.nest()
+    .key(function(row){ return row[that.field] })
+    .entries(graphic.data);
+
+}
+
+
+FlowFacets.prototype = new Facets();
+
+
+function GridFacets(graphic) {
+
+  var that = this;
+
+  this.graphic = graphic;
+  this.xField = graphic.params.facets.grid.x;
+  this.yField = graphic.params.facets.grid.y;
+
+  this.data = graphic.data = d3.nest()
+    .key(function(row){ return row[that.xField] })
+    .key(function(row){ return row[that.yField] })
+    .entries(graphic.data);
+
+}
+
+
+GridFacets.prototype = new Facets();
+
+
+
+// ======
+// SCALES
+// ======
+
+
+function Scale() {}
+
+
+function CategoricalScale() {
+
+}
+
+
+// ======
+// CHARTS
+// ======
+
+
+
+function Chart(data, params) {
 
   this.data = data;
 
@@ -30,20 +116,24 @@ function Chart(data, opts) {
   // and mappings that relate data fields (e.g. "month", "frequency")
   // to aesthetics (e.g. "x", "color").
 
-  this.layers = [];
+  this.layers = params.layers;
 
 }
 
 
-// A layer 
+// ======
+// LAYERS
+// ======
+
+
 function Layer(opts) {
 
   this.geometry = undefined;
 
-  // Layer mapping relates a field in the data source to an aesthetic
-  // on the geometry. E.g. a "month" field would usually relate to the
-  // "x" aesthetic of the geometry. A "frequency" field might map to 
-  // the "color" aesthetic.
+  // ================================================================
+  // Mapping relates a field in the dataset to an aesthetic (visible
+  // attribute) in the graphic. Most commonly this includes x and y
+  // coordinates. Can also include color, size, alpha, etc.
 
   this.mapping = {};
 
@@ -54,6 +144,11 @@ function Layer(opts) {
   this.scales = {};
 
 }
+
+
+// ==========
+// GEOMETRIES
+// ==========
 
 
 // Geometry sets the shape or path that represents a value.
@@ -76,20 +171,12 @@ function PointGeometry(opts) {
 PointGeometry.prototype = new Geometry();
 
 
-function Aesthetic() {}
-
-
-function ColorAesthetic() {
-  this.scale = {};
-}
-
-
-Chart.prototype.render = function(el, width, height) {}
+// ==============
+// RENDER GRAPHIC
+// ==============
 
 
 Graphic.prototype.render = function(el, width, height) {
-
-  this.el = el;
 
   // If width and height are given, draw facets to those dimensions.
   // Otherwise set to the current dimensions of the element.
@@ -104,20 +191,33 @@ Graphic.prototype.render = function(el, width, height) {
     this.height = el.style('height');
   }
 
-  this.svg = el.append('svg');
-  this.svg
+  this.el = el.append('svg');
+
+  this.el
     .attr('width', this.width)
     .attr('height', this.height);
 
-  this.facets = this.svg.selectAll('g.facet');
-  this.facets
-    .data(this.facets)
+  this.facets.render();
+
+}
+
+
+// =============
+// RENDER FACETS
+// =============
+
+
+Facets.prototype.render = function() {
+
+
+
+  this.el = this.graphic.el.selectAll('g.facet');
+  this.el
+    .data(this.data)
     .enter()
     .append('g')
-    .attr('class', 'facet');
-
-  // needs to split up the el into equal portions (less axis) for
-  // facets. If w/h > 1.5
+    .attr('class', 'facet')
+    .attr('data-key', function(d) { return d.key; });
 
 }
 
