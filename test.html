@@ -3,10 +3,14 @@
 
     <meta http-equiv="content-type" content="text/html; charset=UTF8">
 
-    <script src="./d3.js"></script>
-    <script src="./underscore.js"></script>
+    <link href="./ggd3.css" rel="stylesheet" type="text/css"></style>
+    <link href="./vendor/mocha.css" rel="stylesheet" type="text/css"></style>
+
+    <script src="./vendor/d3.js"></script>
+    <script src="./vendor/underscore.js"></script>
+    <script src="./vendor/mocha.js"></script>
+    <script src="./vendor/chai.js"></script>
     <script src="./ggd3.js"></script>
-    <style  src="./ggd3.css"></style>
 
     <style>
 
@@ -36,12 +40,25 @@
 
   <body>
 
-    <h1>GGD3 Examples</h1>
+    <h1>GGD3 Test Suite</h1>
     <hr/>
 
+    <div id="mocha"></div>
     <div class="container"></div>
 
-    <script src="./examples.js"></script>
+    <script>
+      mocha.setup({ 
+        ui: 'bdd', 
+        globals: [], 
+        ignoreLeaks: false, 
+        timeout: 1000
+      });
+    </script>
+
+
+    <script src="./test.js"></script>
+
+    <script>mocha.run()</script>
     
   </body>
 </html>

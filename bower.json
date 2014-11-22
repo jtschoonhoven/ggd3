@@ -1,0 +1,26 @@
+{
+  "name": "ggd3",
+  "main": "ggd3.js",
+  "version": "0.0.0",
+  "homepage": "https://github.com/jtschoonhoven/ggd3",
+  "authors": [
+    "jtschoonhoven <jtschoonhoven@gmail.com>"
+  ],
+  "moduleType": [
+    "globals"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "d3": "~3.4.13",
+    "underscore": "~1.7.0",
+    "mocha": "~2.0.1",
+    "chai": "~1.10.0"
+  }
+}
