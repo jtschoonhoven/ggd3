@@ -4,19 +4,18 @@
 if (!d3 || !_) { throw 'Requires D3 and Underscore.'; }
 
 
-function Facets(data, opts) {
+function Graphic(data, opts) {
 
   this.data = data;
 
-  // Mapping a field in the dataset to a type of facet will
-  // create a separate chart for each unique value in that field.
-  // Possible facets are "flow", "x", and "y". It is possible to
-  // specify an x *and* a y, but neither may combine with flow.
+  // Graphic mapping relates a field in the data source to a facet
+  // aesthetic ("flow", "x", or "y"). Most often this will be left
+  // empty and the graphic will render in a single facet (chart).
 
   this.mapping = {};
 
-  // An array that contains individual facets i.e. instances of
-  // the Chart class.
+  // Graphic layers primarily consist of charts (which in turn)
+  // contain their own sublayers) and axes.
 
   this.facets = [];
 
@@ -27,10 +26,9 @@ function Chart(data, opts) {
 
   this.data = data;
 
-  // Data will be represented among one or more layers. Each layer
-  // has a geometry and a mapping that relates fields to aesthetics.
-  // For example, a Chart may have both line and point geometries.
-  // Subsequent layers are positioned on top of previous layers.
+  // Chart layers consist of a geometry ("line", "bar", "point") 
+  // and mappings that relate data fields (e.g. "month", "frequency")
+  // to aesthetics (e.g. "x", "color").
 
   this.layers = [];
 
@@ -82,35 +80,14 @@ function Aesthetic() {}
 
 
 function ColorAesthetic() {
-
   this.scale = {};
-
 }
 
 
-// Render a chart to the given element.
-// If width & height are provided, will render an SVG of those
-// dimensions. Otherwise, use the current dimensions of the el.
-Chart.prototype.render = function(el, width, height) {
-
-  this.el = el;
-
-  if (width && height) {
-    this.width  = width;
-    this.height = height;
-  }
-
-  else {
-    this.width  = el.style('width');
-    this.height = el.style('height');
-  }
-
-  this.el.append('svg');
-
-}
+Chart.prototype.render = function(el, width, height) {}
 
 
-Facets.prototype.render = function(el, width, height) {
+Graphic.prototype.render = function(el, width, height) {
 
   this.el = el;
 
@@ -127,33 +104,20 @@ Facets.prototype.render = function(el, width, height) {
     this.height = el.style('height');
   }
 
-  // "Flowing" facets will render inside of floated divs.
-  // Cartesian facets ("x" or "y") render inside a table.
-  // If no mapping is chosen, render chart directly in el.
+  this.svg = el.append('svg');
+  this.svg
+    .attr('width', this.width)
+    .attr('height', this.height);
 
-  if (this.mapping.flow) {
-    var facets = el.selectAll('div.facet.flow');
-    facets
-      .data(this.facets)
-      .enter()
-      .append('div')
-      .attr('class', 'facet flow');
-  }
+  this.facets = this.svg.selectAll('g.facet');
+  this.facets
+    .data(this.facets)
+    .enter()
+    .append('g')
+    .attr('class', 'facet');
 
-  else if (this.mapping.x || this.mapping.y) {
-    var facets = el.append('table.facets.grid');
-    facets
-      .data([1])
-      .enter()
-      .append('table')
-      .attr('class', 'facets grid');
-  }
-
-  else {
-    // Render a chart.
-  }
-
-
+  // needs to split up the el into equal portions (less axis) for
+  // facets. If w/h > 1.5
 
 }
 
