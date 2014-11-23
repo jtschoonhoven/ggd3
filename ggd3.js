@@ -51,7 +51,19 @@
   // ======
 
 
-  function Facets() {}
+  function Facets() {
+    this.x;
+    this.y;
+    this.xRange;
+    this.yRange;
+    this.initialize;
+  }
+
+
+  Facets.prototype.initialize = function() {
+    this.x = new CategoricalScale(this.graphic, this.data);
+    this.y = new CategoricalScale(this.graphic, this.data);
+  };
 
 
   function SingleFacet(graphic) {
@@ -59,9 +71,11 @@
     this.graphic = graphic;
     this.data = [{ key: 'single facet', values: graphic.data }];
 
-    // Scales simply return 0 because there is only one facet.
-    this.x = new CategoricalScale(this.graphic, this.data);
-    this.y = new CategoricalScale(this.graphic, this.data);
+    // Range always returns 0 for a singleFacet.
+    this.xRange = function() { return [0]; };
+    this.yRange = function() { return [0]; };
+
+    this.initialize();
 
   }
 
@@ -82,12 +96,9 @@
       .key(function(row){ return row[that.field]; })
       .entries(graphic.data);
 
-    this.x = new CategoricalScale(graphic, this.data);
-    this.y = new CategoricalScale(graphic, this.data);
-
     // xRange return a function that returns the horizontal range of the
     // facet's ordinal scale.
-    this.xRange = function(data) {
+    this.xRange = function() {
 
       var width = parseInt(that.graphic.width);
       var height = parseInt(that.graphic.height);
@@ -100,7 +111,7 @@
 
     };
 
-    this.yRange = function(data) {
+    this.yRange = function() {
 
       var width = parseInt(that.graphic.width);
       var height = parseInt(that.graphic.height);
@@ -112,6 +123,8 @@
       });
 
     };
+
+    this.initialize();
 
   }
 
@@ -132,6 +145,9 @@
       .key(function(row){ return row[that.yField]; })
       .entries(graphic.data);
 
+
+    this.initialize();
+
   }
 
 
@@ -144,18 +160,10 @@
 
 
   function Scale() {
-
-    // At the time a new Scale instance is created the 
-    // width of the svg has not been defined and so the 
-    // range cannot be known. Instead create a function
-    // that accepts an accessor function that can be 
-    // called during render.
-
-    this.setRange = function(accessor) {
-      if (accessor) { this.scale.range(accessor(this.data)); }
-      else { this.scale.range([0]); }
-    };
-
+    this.graphic;
+    this.data;
+    this.scale;
+    this.domain;
   }
 
 
@@ -281,8 +289,10 @@
   Facets.prototype.render = function() {
 
     var that = this;
-    this.x.setRange(this.xRange);
-    this.y.setRange(this.yRange);
+
+    // Calculate range.
+    this.x.scale.range(this.xRange());
+    this.y.scale.range(this.yRange());
 
     this.el = this.graphic.el.selectAll('g.facet');
     this.el
