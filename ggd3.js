@@ -46,23 +46,43 @@
   }
 
 
+  Graphic.prototype.onRender = function() {};
+
+
   // ======
   // FACETS
   // ======
 
 
   function Facets() {
+    this.charts;
     this.x;
     this.y;
     this.xRange;
     this.yRange;
     this.initialize;
+    this.onRender;
   }
 
 
   Facets.prototype.initialize = function() {
+    // The charts array will hold a Chart instance for each facet.
+    this.charts = [];
     this.x = new CategoricalScale(this.graphic, this.data);
     this.y = new CategoricalScale(this.graphic, this.data);
+  };
+
+
+  Facets.prototype.onRender = function() {
+
+    this.width = this.graphic.width;
+    this.height = this.graphic.height;
+
+    this.ratio = Math.floor(this.width/this.height) || 1;
+
+    this.x.scale.range(this.xRange());
+    this.y.scale.range(this.yRange());
+
   };
 
 
@@ -90,38 +110,22 @@
     this.graphic = graphic;
     this.field = graphic.params.facets.flow;
 
-    // Nest the data so that facet fields are at the first level
-    // of the object hierarchy.
+    // Nest the data so that facets are at the top of the tree.
     this.data = graphic.data = d3.nest()
       .key(function(row){ return row[that.field]; })
       .entries(graphic.data);
 
-    // xRange return a function that returns the horizontal range of the
-    // facet's ordinal scale.
+    // Returns the range of the x scale.
     this.xRange = function() {
-
-      var width = parseInt(that.graphic.width);
-      var height = parseInt(that.graphic.height);
-      var domain = that.x.domain;
-      var aspectRatio = Math.floor(width/height) || 1;
-
-      return domain.map(function(d, i) {
-        return domain.length < aspectRatio ? i * (width/domain.length) : (i%aspectRatio) * (width/aspectRatio); 
+      return this.x.domain.map(function(d, i) {
+        return that.x.domain.length < that.ratio ? i * (that.width/that.x.domain.length) : (i%that.ratio) * (that.width/that.ratio); 
       });
-
     };
 
     this.yRange = function() {
-
-      var width = parseInt(that.graphic.width);
-      var height = parseInt(that.graphic.height);
-      var domain = that.y.domain;
-      var aspectRatio = Math.floor(width/height) || 1;
-
-      return domain.map(function(d, i) {
-        return Math.floor(i/aspectRatio) * (domain.length/aspectRatio) * height;
+      return this.y.domain.map(function(d, i) {
+        return Math.floor(i/that.ratio) * (that.y.domain.length/that.ratio) * that.height;
       });
-
     };
 
     this.initialize();
@@ -185,7 +189,7 @@
 
 
 
-  function Chart(data, params) {
+  function Chart() {
 
     this.data = data;
 
@@ -193,7 +197,7 @@
     // and mappings that relate data fields (e.g. "month", "frequency")
     // to aesthetics (e.g. "x", "color").
 
-    this.layers = params.layers;
+    this.initialize();
 
   }
 
@@ -255,6 +259,8 @@
 
   Graphic.prototype.render = function(el, width, height) {
 
+    if (this.onRender) { this.onRender(); }
+
     // If width and height are given, draw facets to those dimensions.
     // Otherwise set to the current dimensions of the element.
 
@@ -276,8 +282,6 @@
 
     this.facets.render();
 
-    return this;
-
   };
 
 
@@ -289,10 +293,7 @@
   Facets.prototype.render = function() {
 
     var that = this;
-
-    // Calculate range.
-    this.x.scale.range(this.xRange());
-    this.y.scale.range(this.yRange());
+    this.onRender();
 
     this.el = this.graphic.el.selectAll('g.facet');
     this.el
@@ -305,7 +306,17 @@
         return 'translate(' + that.x.scale(d.key) + ',' + that.y.scale(d.key) + ')'; 
       });
 
+    this.charts.forEach(function(chart) { chart.render(); });
+
   };
+
+
+  // =============
+  // RENDER CHARTS
+  // =============
+
+
+  Chart.prototype.render = function() {};
 
 
   // ===
