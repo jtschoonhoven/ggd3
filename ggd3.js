@@ -28,18 +28,14 @@
 
   function Graphic(data, params) {
 
-    if (!data || !params) { throw 'Graphic initialized without data or parameters'; }
+    this.data = data || [];
+    this.params = params || {};
 
-    _.defaults(params || {}, { facets: {},  layers: [] });
-
-    this.data = data;
-    this.params = params;
-
-    if (params.facets && params.facets.grid) {
+    if (this.params.facets && this.params.facets.grid) {
       this.facets = new GridFacets(this);
     }
 
-    else if (params.facets && params.facets.flow) {
+    else if (this.params.facets && this.params.facets.flow) {
       this.facets = new FlowFacets(this);
     }
 

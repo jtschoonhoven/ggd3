@@ -41,6 +41,6 @@ gulp.task('test', ['lint'], function() {
 // Lint test.
 gulp.task('lint', function() {
   return gulp.src(['ggd3.js', 'test.js'])
-    .pipe(jshint())
+    .pipe(jshint({ expr: true }))
     .pipe(jshint.reporter(stylish));
 });

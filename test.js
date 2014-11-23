@@ -40,14 +40,22 @@ function addGraphic(el, data, params, width, height) {
 }
 
 
+// =====
+// TESTS
+// =====
+
+
+var expect = chai.expect;
+
 describe('Render', function() {
 
 
-  it('if no parameters are given, defaults to single facet scatterplot', function() {
-
+  it('if no parameters are given, renders an empty single facet', function() {
     var el = addDiv();
     var graphic = addGraphic(el);
-
+    expect(el.select('svg .facet').length).to.equal(1);
+    expect(el.select('svg .facet').selectAll('*').empty()).to.be.true;
+    expect(el.select('svg .facet').attr('data-key')).to.equal('single facet');
   });
 
 
@@ -66,34 +74,4 @@ describe('Facets', function() {
   //   layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
   // };
 
-  // addGraphic(el, data, params);
-
-  // it('test');
-
 });
-
-
-// var examples = [
-
-//   { 
-//     params: { 
-//       facets: { flow: 'country' }, 
-//       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
-//     },
-//     data: threeDimensional
-//   },
-
-//   {
-//     params: {
-//       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units' } }]
-//     },
-//     data: twoDimensional
-//   }
-
-// ];
-
-// examples.forEach(function(example) {
-//   var el = d3.select('.container').append('div').attr('class', 'example');
-//   var graphic = new Graphic(example.data, example.params);
-//   graphic.render(el);
-// });
