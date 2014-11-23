@@ -51,12 +51,7 @@
   // ======
 
 
-  function Facets() {
-    this.scale = {};
-    this.scale.x = d3.scale.ordinal();
-    this.scale.y = d3.scale.ordinal();
-    this.setRange = _.noop;
-  }
+  function Facets() {}
 
 
   function SingleFacet(graphic) {
@@ -65,8 +60,8 @@
     this.data = [{ key: 'single facet', values: graphic.data }];
 
     // Scales simply return 0 because there is only one facet.
-    this.scale.x.range([0]);
-    this.scale.y.range([0]);
+    this.x = { scale: d3.scale.ordinal().range([0]) };
+    this.y = { scale: d3.scale.ordinal().range([0]) };
 
   }
 
@@ -87,11 +82,8 @@
       .key(function(row){ return row[that.field]; })
       .entries(graphic.data);
 
-    // Get the unique facet values from the nested data.
-    // These form the scale domain.
-    var domain = this.data.map(function(facet) { return facet.key; });
-    this.scale.x.domain(domain);
-    this.scale.y.domain(domain);
+    this.x = new CategoricalScale(graphic, this.data);
+    this.y = new CategoricalScale(graphic, this.data);
 
     // Range depends on the width of the target element and so
     // can't be computed until render() is called.
@@ -107,16 +99,16 @@
       // facet columns are there for every facet row?"
       var aspectRatio = Math.floor(width/height) || 1;
 
-      var rangeX = domain.map(function(d,i) {
+      var rangeX = this.x.scale.domain().map(function(d,i) {
         return domain.length < aspectRatio ? i * (width/domain.length) : (i%aspectRatio) * (width/aspectRatio); 
       });
 
-      var rangeY = domain.map(function(d,i) { 
+      var rangeY = this.y.scale.domain().map(function(d,i) { 
         return Math.floor(i / aspectRatio) * (domain.length/aspectRatio) * height; 
       });
 
-      this.scale.x.range(rangeX);
-      this.scale.y.range(rangeY); 
+      this.x.scale.range(rangeX);
+      this.y.scale.range(rangeY); 
 
     };
 
@@ -151,16 +143,13 @@
   // ======
 
 
-  function Scale() {
-    this.domain = [];
-    this.range = [];
-  }
+  function Scale() {}
 
 
-  function CategoricalScale(graphic) {
-
+  function CategoricalScale(graphic, data) {
+    this.data = data;
     this.scale = d3.scale.ordinal();
-
+    this.domain = data.map(function(category) { return category.key; });
   }
 
 
@@ -290,7 +279,7 @@
       .attr('class', 'facet')
       .attr('data-key', function(d) { return d.key; })
       .attr('transform', function(d, i) { 
-        return 'translate(' + that.scale.x(d.key) + ',' + that.scale.y(d.key) + ')'; 
+        return 'translate(' + that.x.scale(d.key) + ',' + that.y.scale(d.key) + ')'; 
       });
 
   };

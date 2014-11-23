@@ -1,5 +1,6 @@
 
 var gulp       = require('gulp')
+,   gutil      = require('gulp-util')
 ,   bower      = require('gulp-bower')
 ,   bowerFiles = require('main-bower-files')
 ,   jshint     = require('gulp-jshint')
@@ -34,7 +35,7 @@ gulp.task('watch', ['test'], function() {
 gulp.task('test', ['lint'], function() {
   gulp.src('./test.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }))
-    .on('error', function(err) {});
+    .on('error', function(err) { gutil.log(err.stack) });
 });
 
 

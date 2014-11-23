@@ -49,29 +49,50 @@ var expect = chai.expect;
 
 describe('Render', function() {
 
-
-  it('if no parameters are given, renders an empty single facet', function() {
+  it('if no parameters are given, renders an empty svg', function() {
     var el = addDiv();
     var graphic = addGraphic(el);
     expect(el.select('svg .facet').length).to.equal(1);
     expect(el.select('svg .facet').selectAll('*').empty()).to.be.true;
-    expect(el.select('svg .facet').attr('data-key')).to.equal('single facet');
   });
 
 
-  it('if width and height are not specified, renders to current dimensions of element');
-
+  it('if width and height are not specified, renders svg to current dimensions of element', function() {
+    var el = addDiv();
+    var graphic = addGraphic(el);
+    expect(el.style('height')).to.equal(el.select('svg').attr('height'));
+    expect(el.style('width')).to.equal(el.select('svg').attr('width'));
+  });
 
 });
 
 
 describe('Facets', function() {
 
-  // var el = addDiv();
-  // var data = data.threeDimensional;
-  // var params = {
-  //   facets: { flow: 'country' }, 
-  //   layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
-  // };
+  it('if no facet params are given, default to single facet', function() {
+    var el = addDiv();
+    var graphic = addGraphic(el);
+    expect(el.select('svg .facet').attr('data-key')).to.equal('single facet');
+  });
+
+
+  it('creates a facet group for each key specified by the floating facet', function() {
+
+    var el = addDiv();
+    var params = {
+      facets: { flow: 'country' }, 
+      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
+    };
+
+    var graphic = addGraphic(el, data.threeDimensional, params);
+    
+  });
 
 });
+
+
+// var data = data.threeDimensional;
+// var params = {
+//   facets: { flow: 'country' }, 
+//   layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
+// };
