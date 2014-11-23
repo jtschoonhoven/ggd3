@@ -60,8 +60,8 @@
     this.data = [{ key: 'single facet', values: graphic.data }];
 
     // Scales simply return 0 because there is only one facet.
-    this.x = { scale: d3.scale.ordinal().range([0]) };
-    this.y = { scale: d3.scale.ordinal().range([0]) };
+    this.x = new CategoricalScale(this.graphic, this.data);
+    this.y = new CategoricalScale(this.graphic, this.data);
 
   }
 
@@ -85,33 +85,33 @@
     this.x = new CategoricalScale(graphic, this.data);
     this.y = new CategoricalScale(graphic, this.data);
 
-    // Range depends on the width of the target element and so
-    // can't be computed until render() is called.
+    // xRange return a function that returns the horizontal range of the
+    // facet's ordinal scale.
+    this.xRange = function(data) {
 
-    this.setRange = function() {
-
-      var that = this;
-      var width = parseInt(graphic.width);
-      var height = parseInt(graphic.height);
-
-      // Get the ratio of width to height.
-      // Ratio happens to answer the question, "how many
-      // facet columns are there for every facet row?"
+      var width = parseInt(that.graphic.width);
+      var height = parseInt(that.graphic.height);
+      var domain = that.x.domain;
       var aspectRatio = Math.floor(width/height) || 1;
 
-      var rangeX = this.x.scale.domain().map(function(d,i) {
+      return domain.map(function(d, i) {
         return domain.length < aspectRatio ? i * (width/domain.length) : (i%aspectRatio) * (width/aspectRatio); 
       });
 
-      var rangeY = this.y.scale.domain().map(function(d,i) { 
-        return Math.floor(i / aspectRatio) * (domain.length/aspectRatio) * height; 
-      });
-
-      this.x.scale.range(rangeX);
-      this.y.scale.range(rangeY); 
-
     };
 
+    this.yRange = function(data) {
+
+      var width = parseInt(that.graphic.width);
+      var height = parseInt(that.graphic.height);
+      var domain = that.y.domain;
+      var aspectRatio = Math.floor(width/height) || 1;
+
+      return domain.map(function(d, i) {
+        return Math.floor(i/aspectRatio) * (domain.length/aspectRatio) * height;
+      });
+
+    };
 
   }
 
@@ -143,13 +143,28 @@
   // ======
 
 
-  function Scale() {}
+  function Scale() {
+
+    // At the time a new Scale instance is created the 
+    // width of the svg has not been defined and so the 
+    // range cannot be known. Instead create a function
+    // that accepts an accessor function that can be 
+    // called during render.
+
+    this.setRange = function(accessor) {
+      if (accessor) { this.scale.range(accessor(this.data)); }
+      else { this.scale.range([0]); }
+    };
+
+  }
 
 
   function CategoricalScale(graphic, data) {
+    this.graphic = graphic;
     this.data = data;
     this.scale = d3.scale.ordinal();
     this.domain = data.map(function(category) { return category.key; });
+    this.scale.domain(this.domain);
   }
 
 
@@ -266,10 +281,8 @@
   Facets.prototype.render = function() {
 
     var that = this;
-
-    // Now that the element width is defined we can set
-    // the range of the facet scale.
-    this.setRange();
+    this.x.setRange(this.xRange);
+    this.y.setRange(this.yRange);
 
     this.el = this.graphic.el.selectAll('g.facet');
     this.el
