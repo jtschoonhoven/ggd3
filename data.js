@@ -1,5 +1,10 @@
 
-var sampleData = {
+var data = {
+
+  simple: [
+    { units: 1, frequency: 2 },
+    { units: 3, frequency: 4 }
+  ],
 
   threeDimensional: [
     { day: 1, country: 'US', units: 3 },
@@ -20,5 +25,5 @@ var sampleData = {
 };
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = sampleData;
+  module.exports = data;
 }

@@ -268,6 +268,8 @@
 
     this.facets.render();
 
+    return this;
+
   };
 
 

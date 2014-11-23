@@ -25,21 +25,22 @@ gulp.task('bower-build', function() {
 
 
 // Watch ggd3 for changes and run tests on save.
-gulp.task('watch', function() {
-  return gulp.watch('ggd3.js', ['test']);
+gulp.task('watch', ['test'], function() {
+  return gulp.watch(['ggd3.js', 'test.js'], ['test']);
 });
 
 
 // Run test and lint.
 gulp.task('test', ['lint'], function() {
-  return gulp.src('./test.js', { read: false })
+  gulp.src('./test.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }))
+    .on('error', function(err) {});
 });
 
 
 // Lint test.
 gulp.task('lint', function() {
-  return gulp.src('ggd3.js')
+  return gulp.src(['ggd3.js', 'test.js'])
     .pipe(jshint())
     .pipe(jshint.reporter(stylish));
 });
