@@ -72,11 +72,11 @@ describe('Facets', function() {
   it('if no facet params are given, default to single facet', function() {
     var el = addDiv();
     var graphic = addGraphic(el);
-    expect(el.selectAll('svg .facet').attr('data-key')).to.equal('single facet');
+    expect(el.selectAll('svg .facet').attr('data-key')).to.be.null;
   });
 
 
-  it('creates a facet group for each key specified by the floating facet', function() {
+  it.only('creates a facet group for each key specified by the floating facet', function() {
     var el = addDiv();
     var params = {
       facets: { flow: 'country' }, 

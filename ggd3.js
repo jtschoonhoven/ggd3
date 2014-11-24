@@ -55,6 +55,7 @@
 
 
   function Facets() {
+    // Listing methods here for clarity.
     this.charts;
     this.x;
     this.y;
@@ -66,8 +67,8 @@
 
 
   Facets.prototype.initialize = function() {
-    // The charts array will hold a Chart instance for each facet.
-    this.charts = [];
+    // Facets use x and y categorical scales to arrange themselves
+    // across the graphic.
     this.x = new CategoricalScale(this.graphic, this.data);
     this.y = new CategoricalScale(this.graphic, this.data);
   };
@@ -75,11 +76,14 @@
 
   Facets.prototype.onRender = function() {
 
-    this.width = this.graphic.width;
-    this.height = this.graphic.height;
+    this.width = parseInt(this.graphic.width);
+    this.height = parseInt(this.graphic.height);
 
+    // The (rounded) ratio of width to height is used to determing
+    // how facets are arranged across the graphic.
     this.ratio = Math.floor(this.width/this.height) || 1;
 
+    // Calculate the range of the x and y scales.
     this.x.scale.range(this.xRange());
     this.y.scale.range(this.yRange());
 
@@ -89,7 +93,8 @@
   function SingleFacet(graphic) {
 
     this.graphic = graphic;
-    this.data = [{ key: 'single facet', values: graphic.data }];
+    this.data = [{ key: undefined, values: graphic.data }];
+    this.charts = [ new Chart(this, this.data) ];
 
     // Range always returns 0 for a singleFacet.
     this.xRange = function() { return [0]; };
@@ -114,6 +119,10 @@
     this.data = graphic.data = d3.nest()
       .key(function(row){ return row[that.field]; })
       .entries(graphic.data);
+
+    // Create an instance of Chart for each key in this.data.
+    this.charts = this.data.map(function(d) { return new Chart(that, d); });
+
 
     // Returns the range of the x scale.
     this.xRange = function() {
@@ -189,9 +198,11 @@
 
 
 
-  function Chart() {
+  function Chart(facet) {
 
-    this.data = data;
+    this.facet = facet;
+    this.data = facet.data;
+    this.values = facet.data.values;
 
     // Chart layers consist of a geometry ("line", "bar", "point") 
     // and mappings that relate data fields (e.g. "month", "frequency")
@@ -200,6 +211,10 @@
     this.initialize();
 
   }
+
+  Chart.prototype.initialize = function() {};
+
+  Chart.prototype.onRender = function() {};
 
 
   // ======
@@ -297,13 +312,13 @@
 
     this.el = this.graphic.el.selectAll('g.facet');
     this.el
-      .data(this.data)
+      .data(this.charts)
       .enter()
       .append('g')
       .attr('class', 'facet')
-      .attr('data-key', function(d) { return d.key; })
-      .attr('transform', function(d, i) { 
-        return 'translate(' + that.x.scale(d.key) + ',' + that.y.scale(d.key) + ')'; 
+      .attr('data-key', function(chart) { return chart.key; })
+      .attr('transform', function(chart) { 
+        return 'translate(' + that.x.scale(chart.key) + ',' + that.y.scale(chart.key) + ')'; 
       });
 
     this.charts.forEach(function(chart) { chart.render(); });
@@ -316,7 +331,20 @@
   // =============
 
 
-  Chart.prototype.render = function() {};
+  Chart.prototype.render = function() {
+
+    var that = this;
+    this.onRender();
+
+    this.el = this.facet.graphic.el.selectAll('g.chart');
+    this.el
+      .data(this.data)
+      .enter()
+      .append('g')
+      .attr('class', 'chart')
+      .attr('data-key', this.key);
+
+  };
 
 
   // ===
