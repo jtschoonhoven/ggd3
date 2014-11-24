@@ -333,8 +333,9 @@
 
   Chart.prototype.render = function() {
 
-    var that = this;
     this.onRender();
+    
+    var that = this;
 
     this.el = this.facet.graphic.el.selectAll('g.chart');
     this.el
