@@ -55,14 +55,16 @@
 
 
   function Facets() {
-    // Listing methods here for clarity.
-    this.charts;
+    this.charts = [];
     this.x;
     this.y;
     this.xRange;
     this.yRange;
     this.initialize;
     this.onRender;
+    this.width;
+    this.height;
+    this.ratio;
   }
 
 
@@ -74,14 +76,19 @@
   };
 
 
+  // Calculate the dimensions of the facet group and apply scale range.
   Facets.prototype.onRender = function() {
 
     this.width = parseInt(this.graphic.width);
     this.height = parseInt(this.graphic.height);
 
-    // The (rounded) ratio of width to height is used to determing
+    // The (rounded) ratio of width to height is used to determine
     // how facets are arranged across the graphic.
-    this.ratio = Math.floor(this.width/this.height) || 1;
+    this.ratio = this.width/this.height >= 1 ? Math.floor(this.width/this.height) : 1/Math.floor(this.height/this.width);
+
+    // Calculate the number of rows and cols based on the aspect ratio.
+    this.numRows = Math.ceil(this.y.domain.length/this.ratio);
+    this.numCols = Math.ceil(this.x.domain.length/this.numRows);
 
     // Calculate the range of the x and y scales.
     this.x.scale.range(this.xRange());
@@ -127,13 +134,16 @@
     // Returns the range of the x scale.
     this.xRange = function() {
       return this.x.domain.map(function(d, i) {
-        return that.x.domain.length < that.ratio ? i * (that.width/that.x.domain.length) : (i%that.ratio) * (that.width/that.ratio); 
+        if (that.x.domain.length < that.ratio) { return i * (that.width/that.x.domain.length); }
+        var colNum = i % that.ratio;
+        return (colNum/that.numCols) * that.width; 
       });
     };
 
     this.yRange = function() {
       return this.y.domain.map(function(d, i) {
-        return Math.floor(i/that.ratio) * (that.y.domain.length/that.ratio) * that.height;
+        var rowNum = Math.floor(i/that.ratio);
+        return (rowNum/that.numRows) * that.height;
       });
     };
 
@@ -198,11 +208,11 @@
 
 
 
-  function Chart(facet) {
+  function Chart(facets, data) {
 
-    this.facet = facet;
-    this.data = facet.data;
-    this.values = facet.data.values;
+    this.facets = facets;
+    this.key = data.key;
+    this.data = data.values;
 
     // Chart layers consist of a geometry ("line", "bar", "point") 
     // and mappings that relate data fields (e.g. "month", "frequency")
@@ -212,9 +222,24 @@
 
   }
 
+
   Chart.prototype.initialize = function() {};
 
-  Chart.prototype.onRender = function() {};
+
+  // Calculate chart dimensions from facet dimensions.
+  Chart.prototype.onRender = function() {
+
+    var numCharts = this.facets.charts.length;
+    var ratio = this.facets.ratio;
+
+    var numRows = ratio >= 1 ?  Math.ceil(numCharts/ratio) : Math.ceil(ratio/numCharts);
+    var numCols = Math.ceil(numCharts/numRows);
+
+
+    this.width = this.facets.width/numCols;
+    this.height = this.facets.height/numRows;
+
+  };
 
 
   // ======
@@ -310,6 +335,7 @@
     var that = this;
     this.onRender();
 
+    // Create a "facet" group bound to each chart in this.charts.
     this.el = this.graphic.el.selectAll('g.facet');
     this.el
       .data(this.charts)
@@ -319,9 +345,8 @@
       .attr('data-key', function(chart) { return chart.key; })
       .attr('transform', function(chart) { 
         return 'translate(' + that.x.scale(chart.key) + ',' + that.y.scale(chart.key) + ')'; 
-      });
-
-    this.charts.forEach(function(chart) { chart.render(); });
+      })
+      .each(function(chart, index) { chart.render(this, index); });
 
   };
 
@@ -331,19 +356,20 @@
   // =============
 
 
-  Chart.prototype.render = function() {
+  Chart.prototype.render = function(el, index) {
 
     this.onRender();
-    
+
     var that = this;
 
-    this.el = this.facet.graphic.el.selectAll('g.chart');
+    this.el = d3.select(el);
     this.el
-      .data(this.data)
-      .enter()
-      .append('g')
-      .attr('class', 'chart')
-      .attr('data-key', this.key);
+      .append('rect')
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .style('fill', 'none')
+      .style('stroke-width', 2)
+      .style('stroke', 'black')
 
   };
 
