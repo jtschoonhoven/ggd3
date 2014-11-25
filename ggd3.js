@@ -21,6 +21,19 @@
   if (!d3 || !_) { throw 'GGD3 requires D3 and Underscore.'; }
 
 
+  // ====
+  // SPEC
+  // ====
+
+
+  function Spec(opts) {
+    _.extend(this, opts);
+    this.facets = _.defaults(this.facets || {}, { flow: undefined });
+    this.layers = _.defaults(this.layers || []);
+    this.groups = _.defaults(this.groups || {}, { key: undefined });
+  }
+
+
   // ========
   // GRAPHICS
   // ========
@@ -42,17 +55,6 @@
   }
 
 
-  // ====
-  // SPEC
-  // ====
-
-
-  function Spec(opts) {
-    _.extend(this, opts);
-    this.facets = _.defaults(this.facets || {}, { flow: undefined });
-  }
-
-
   // ======
   // FACETS
   // ======
@@ -60,32 +62,10 @@
 
   function Facets(graphic) {}
 
-  Facets.prototype.initialize = function() {
-    this.x = new CategoricalScale(this.data, 'key');
-    this.y = new CategoricalScale(this.data, 'key');
-  };
 
-
-  // Calculate the dimensions of the facet group and apply scale range.
-  Facets.prototype.onRender = function() {
-
-    this.width = parseInt(this.graphic.width);
-    this.height = parseInt(this.graphic.height);
-
-    // The (rounded) ratio of width to height is used to determine
-    // how facets are arranged across the graphic.
-    this.ratio = this.width/this.height >= 1 ? Math.floor(this.width/this.height) : 1/Math.floor(this.height/this.width);
-
-    // Calculate the number of rows and cols based on the aspect ratio.
-    this.numRows = this.ratio >= 1 ? Math.ceil(this.y.domain.length/this.ratio) : Math.ceil(this.ratio/this.y.domain.length);
-    this.numCols = Math.ceil(this.x.domain.length/this.numRows);
-
-    // Calculate the range of the x and y scales.
-    this.x.scale.range(this.xRange());
-    this.y.scale.range(this.yRange());
-
-  };
-
+  // ============
+  // FACETS: FLOW
+  // ============
 
   function FlowFacets(graphic) {
 
@@ -101,13 +81,12 @@
     // Create an instance of Chart for each key in this.data.
     this.charts = this.data.map(function(data) {  return new Chart(that, data); });
 
-    this.initialize();
+    this.x = new CategoricalScale(this.data, 'key');
+    this.y = new CategoricalScale(this.data, 'key');
 
   }
 
-
   FlowFacets.prototype = new Facets();
-
 
   FlowFacets.prototype.xRange = function() {
     var that = this;
@@ -118,7 +97,6 @@
     });
   };
 
-
   FlowFacets.prototype.yRange = function() {
     var that = this;
     return this.y.domain.map(function(d, i) {
@@ -128,6 +106,9 @@
   };
 
 
+  // ============
+  // FACETS: GRID
+  // ============
 
 
   function GridFacets(graphic) {
@@ -344,10 +325,29 @@
   // =============
 
 
+  Facets.prototype.preRender = function() {
+
+    this.width = parseInt(this.graphic.width);
+    this.height = parseInt(this.graphic.height);
+
+    // The (rounded) ratio of width to height is used to determine
+    // how facets are arranged across the graphic.
+    this.ratio = this.width/this.height >= 1 ? Math.floor(this.width/this.height) : 1/Math.floor(this.height/this.width);
+
+    // Calculate the number of rows and cols based on the aspect ratio.
+    this.numRows = this.ratio >= 1 ? Math.ceil(this.y.domain.length/this.ratio) : Math.ceil(this.ratio/this.y.domain.length);
+    this.numCols = Math.ceil(this.x.domain.length/this.numRows);
+
+    // Calculate the range of the x and y scales.
+    this.x.scale.range(this.xRange());
+    this.y.scale.range(this.yRange());
+
+  };
+
   Facets.prototype.render = function() {
 
     var that = this;
-    this.onRender();
+    this.preRender();
 
     // Create a "facet" group bound to each chart in this.charts.
     this.el = this.graphic.el.selectAll('g.facet');
