@@ -184,7 +184,7 @@
 
 
   function CategoricalScale(data, key) {
-    this.data = data;
+    this.key = key;
     this.scale = d3.scale.ordinal();
     this.domain = data.map(function(row) { return row[key]; });
     this.scale.domain(this.domain);
@@ -199,10 +199,26 @@
 
 
   function LinearScale(data, key) {
-    this.data = data;
+    this.key = key;
     this.scale = d3.scale.linear();
     this.domain = d3.extent( data.map(function(row) { return row[key]; }) );
     this.scale.domain(this.domain);
+  }
+
+  LinearScale.prototype = new Scale();
+
+
+  // =============
+  // SCALES: COLOR
+  // =============
+
+
+  function ColorScale(data, key) {
+    this.key = key;
+    this.scale = d3.scale.category10();
+    this.domain = data.map(function(row) { return row[key]; });
+    this.scale.domain(this.domain);
+    console.log(this.domain)
   }
 
   LinearScale.prototype = new Scale();
@@ -245,6 +261,7 @@
 
     this.mapping = opts.mapping || {};
     this.scale = {};
+
     this.x = new LinearScale(this.data, this.mapping.x);
     this.y = new LinearScale(this.data, this.mapping.y);
 
@@ -276,8 +293,12 @@
 
   function Geometry() {}
 
-
   Geometry.prototype.onRender = function() {};
+
+  Geometry.prototype.initialize = function() {
+    var color = this.layer.mapping.color;
+    this.color = new ColorScale(this.data, color);
+  };
 
 
   // =================
@@ -297,8 +318,9 @@
       .key(function(row){ return row[that.layer.mapping.group]; })
       .entries(layer.data);
 
-  }
+    this.initialize();
 
+  }
 
   PointGeometry.prototype = new Geometry();
 
@@ -372,9 +394,8 @@
 
   Chart.prototype.render = function(el, index) {
 
-    this.onRender();
-
     var that = this;
+    this.onRender();
 
     this.el = d3.select(el);
     this.el.selectAll('g.layers')
@@ -430,10 +451,10 @@
       .data(function(group) { return group.values; })
       .enter()
       .append('circle')
-      .attr('cx', function(row) { return that.layer.x.scale(row[that.layer.mapping.x]); })
-      .attr('cy', function(row) { return that.layer.y.scale(row[that.layer.mapping.y]); })
+      .attr('cx', function(row) { return that.layer.x.scale(row[that.layer.x.key]); })
+      .attr('cy', function(row) { return that.layer.y.scale(row[that.layer.y.key]); })
       .attr('r', 3)
-      .attr('fill', 'black')
+      .attr('fill', function(row) { return that.color.scale(row[that.color.key]); })
       .attr('stroke', 'none');
 
   };
