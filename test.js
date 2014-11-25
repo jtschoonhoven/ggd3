@@ -47,33 +47,8 @@ function addGraphic(el, data, params, width, height) {
 
 var expect = chai.expect;
 
-describe('Render', function() {
-
-  it('if no parameters are given, renders an empty svg', function() {
-    var el = addDiv();
-    var graphic = addGraphic(el);
-    expect(el.selectAll('svg .facet').size()).to.equal(1);
-  });
-
-
-  it('if width and height are not specified, renders svg to current dimensions of element', function() {
-    var el = addDiv();
-    var graphic = addGraphic(el);
-    expect(el.style('height')).to.equal(el.select('svg').attr('height'));
-    expect(el.style('width')).to.equal(el.select('svg').attr('width'));
-  });
-
-});
-
 
 describe('Facets', function() {
-
-  it('if no facet params are given, default to single facet', function() {
-    var el = addDiv();
-    var graphic = addGraphic(el);
-    expect(el.selectAll('svg .facet').attr('data-key')).to.be.null;
-  });
-
 
   it('creates a facet group for each key specified by the facet mapping (float)', function() {
     var el = addDiv();

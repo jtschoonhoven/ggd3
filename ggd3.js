@@ -26,27 +26,31 @@
   // ========
 
 
-  function Graphic(data, params) {
+  function Graphic(data, spec) {
 
     this.data = data || [];
-    this.params = params || {};
+    this.spec = new Spec(spec);
 
-    if (this.params.facets && this.params.facets.grid) {
+    if (this.spec.facets.x || this.spec.facets.y) {
       this.facets = new GridFacets(this);
     }
 
-    else if (this.params.facets && this.params.facets.flow) {
-      this.facets = new FlowFacets(this);
-    }
-
     else {
-      this.facets = new SingleFacet(this);
+      this.facets = new FlowFacets(this);
     }
 
   }
 
 
-  Graphic.prototype.onRender = function() {};
+  // ====
+  // SPEC
+  // ====
+
+
+  function Spec(opts) {
+    _.extend(this, opts);
+    this.facets = _.defaults(this.facets || {}, { flow: undefined });
+  }
 
 
   // ======
@@ -54,12 +58,9 @@
   // ======
 
 
-  function Facets(graphic) {
-  }
+  function Facets(graphic) {}
 
   Facets.prototype.initialize = function() {
-    // Facets use x and y categorical scales to arrange themselves
-    // across the graphic.
     this.x = new CategoricalScale(this.data, 'key');
     this.y = new CategoricalScale(this.data, 'key');
   };
@@ -86,29 +87,11 @@
   };
 
 
-  function SingleFacet(graphic) {
-
-    this.graphic = graphic;
-    this.data = [{ key: undefined, values: graphic.data }];
-    this.charts = [ new Chart(this, this.data[0]) ];
-
-    // Range always returns 0 for a singleFacet.
-    this.xRange = function() { return [0]; };
-    this.yRange = function() { return [0]; };
-
-    this.initialize();
-
-  }
-
-
-  SingleFacet.prototype = new Facets();
-
-
   function FlowFacets(graphic) {
 
     var that = this;
     this.graphic = graphic;
-    this.field = graphic.params.facets.flow;
+    this.field = graphic.spec.facets.flow;
 
     // Nest the data so that facets are at the top of the tree.
     this.data = graphic.data = d3.nest()
@@ -153,8 +136,8 @@
 
     this.graphic = graphic;
 
-    this.xField = graphic.params.facets.grid.x;
-    this.yField = graphic.params.facets.grid.y;
+    this.xField = graphic.spec.facets.grid.x;
+    this.yField = graphic.spec.facets.grid.y;
 
     this.data = graphic.data = d3.nest()
       .key(function(row){ return row[that.xField]; })
@@ -218,7 +201,6 @@
     this.scale = d3.scale.category10();
     this.domain = data.map(function(row) { return row[key]; });
     this.scale.domain(this.domain);
-    console.log(this.domain)
   }
 
   LinearScale.prototype = new Scale();
@@ -237,7 +219,7 @@
     this.key = data.key;
     this.data = data.values;
 
-    var layerOpts = facets.graphic.params.layers || [];
+    var layerOpts = facets.graphic.spec.layers || [];
     this.layers = layerOpts.map(function(opts) { return new Layer(that, opts); });
 
   }
@@ -331,8 +313,6 @@
 
 
   Graphic.prototype.render = function(el, width, height) {
-
-    this.onRender();
 
     // If width and height are given, draw facets to those dimensions.
     // Otherwise set to the current dimensions of the element.
