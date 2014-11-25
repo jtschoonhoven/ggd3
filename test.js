@@ -49,7 +49,7 @@ var expect = chai.expect;
 
 describe('Render', function() {
 
-  it('if no parameters are given, renders an empty svg', function() {
+  it.only('if no parameters are given, renders an empty svg', function() {
     var el = addDiv();
     var graphic = addGraphic(el);
     expect(el.selectAll('svg .facet').size()).to.equal(1);

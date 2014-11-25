@@ -40,8 +40,9 @@
     }
 
     else {
-      this.facets = new SingleFacet(this);
+      this.facets = new FlowFacets(this);
     }
+
 
   }
 
@@ -54,14 +55,11 @@
   // ======
 
 
-  function Facets(graphic) {
-  }
+  function Facets() {}
 
   Facets.prototype.initialize = function() {
-    // Facets use x and y categorical scales to arrange themselves
-    // across the graphic.
-    this.x = new CategoricalScale(this.data, 'key');
-    this.y = new CategoricalScale(this.data, 'key');
+    _.extend(this.x, new CategoricalScale(this.data, this.x.key));
+    _.extend(this.y, new CategoricalScale(this.data, this.y.key));
   };
 
 
@@ -86,34 +84,15 @@
   };
 
 
-  function SingleFacet(graphic) {
-
-    this.graphic = graphic;
-    this.data = [{ key: undefined, values: graphic.data }];
-    this.charts = [ new Chart(this, this.data[0]) ];
-
-    // Range always returns 0 for a singleFacet.
-    this.xRange = function() { return [0]; };
-    this.yRange = function() { return [0]; };
-
-    this.initialize();
-
-  }
-
-
-  SingleFacet.prototype = new Facets();
-
-
   function FlowFacets(graphic) {
 
     var that = this;
-    this.graphic = graphic;
-    this.field = graphic.params.facets.flow;
 
-    // Nest the data so that facets are at the top of the tree.
-    this.data = graphic.data = d3.nest()
-      .key(function(row){ return row[that.field]; })
-      .entries(graphic.data);
+    this.x = { key: graphic.params.facets ? graphic.params.facets.flow : undefined };
+    this.y = { key: graphic.params.facets ? graphic.params.facets.flow : undefined };
+
+    this.graphic = graphic;
+    this.data = graphic.data;
 
     // Create an instance of Chart for each key in this.data.
     this.charts = this.data.map(function(data) {  return new Chart(that, data); });
@@ -122,9 +101,7 @@
 
   }
 
-
   FlowFacets.prototype = new Facets();
-
 
   FlowFacets.prototype.xRange = function() {
     var that = this;
@@ -152,6 +129,9 @@
     var that = this;
 
     this.graphic = graphic;
+
+    this.x = { key: graphic.params.facets.x };
+    this.y = { key: graphic.params.facets.y };
 
     this.xField = graphic.params.facets.grid.x;
     this.yField = graphic.params.facets.grid.y;
@@ -186,7 +166,7 @@
   function CategoricalScale(data, key) {
     this.key = key;
     this.scale = d3.scale.ordinal();
-    this.domain = data.map(function(row) { return row[key]; });
+    this.domain = _.uniq(data, function(row) { return row[key]; });
     this.scale.domain(this.domain);
   }
 
@@ -218,7 +198,6 @@
     this.scale = d3.scale.category10();
     this.domain = data.map(function(row) { return row[key]; });
     this.scale.domain(this.domain);
-    console.log(this.domain)
   }
 
   LinearScale.prototype = new Scale();
@@ -313,10 +292,6 @@
     this.layer = layer;
     this.type = 'point';
 
-    // Nest data by "group" mapping.
-    this.data = d3.nest()
-      .key(function(row){ return row[that.layer.mapping.group]; })
-      .entries(layer.data);
 
     this.initialize();
 
