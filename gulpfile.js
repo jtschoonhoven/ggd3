@@ -35,7 +35,7 @@ gulp.task('watch', ['test'], function() {
 gulp.task('test', ['lint'], function() {
   gulp.src('./test.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }))
-    .on('error', function(err) { gutil.log(err.stack || err.message) });
+    .on('error', function(err) { return gutil.log(err.stack || err.message); });
 });
 
 

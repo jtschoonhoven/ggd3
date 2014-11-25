@@ -54,25 +54,14 @@
   // ======
 
 
-  function Facets() {
-    this.charts = [];
-    this.x;
-    this.y;
-    this.xRange;
-    this.yRange;
-    this.initialize;
-    this.onRender;
-    this.width;
-    this.height;
-    this.ratio;
+  function Facets(graphic) {
   }
-
 
   Facets.prototype.initialize = function() {
     // Facets use x and y categorical scales to arrange themselves
     // across the graphic.
-    this.x = new CategoricalScale(this.graphic, this.data);
-    this.y = new CategoricalScale(this.graphic, this.data);
+    this.x = new CategoricalScale(this.data, 'key');
+    this.y = new CategoricalScale(this.data, 'key');
   };
 
 
@@ -87,7 +76,7 @@
     this.ratio = this.width/this.height >= 1 ? Math.floor(this.width/this.height) : 1/Math.floor(this.height/this.width);
 
     // Calculate the number of rows and cols based on the aspect ratio.
-    this.numRows = Math.ceil(this.y.domain.length/this.ratio);
+    this.numRows = this.ratio >= 1 ? Math.ceil(this.y.domain.length/this.ratio) : Math.ceil(this.ratio/this.y.domain.length);
     this.numCols = Math.ceil(this.x.domain.length/this.numRows);
 
     // Calculate the range of the x and y scales.
@@ -101,7 +90,7 @@
 
     this.graphic = graphic;
     this.data = [{ key: undefined, values: graphic.data }];
-    this.charts = [ new Chart(this, this.data) ];
+    this.charts = [ new Chart(this, this.data[0]) ];
 
     // Range always returns 0 for a singleFacet.
     this.xRange = function() { return [0]; };
@@ -118,7 +107,6 @@
   function FlowFacets(graphic) {
 
     var that = this;
-
     this.graphic = graphic;
     this.field = graphic.params.facets.flow;
 
@@ -128,24 +116,7 @@
       .entries(graphic.data);
 
     // Create an instance of Chart for each key in this.data.
-    this.charts = this.data.map(function(d) { return new Chart(that, d); });
-
-
-    // Returns the range of the x scale.
-    this.xRange = function() {
-      return this.x.domain.map(function(d, i) {
-        if (that.x.domain.length < that.ratio) { return i * (that.width/that.x.domain.length); }
-        var colNum = i % that.ratio;
-        return (colNum/that.numCols) * that.width; 
-      });
-    };
-
-    this.yRange = function() {
-      return this.y.domain.map(function(d, i) {
-        var rowNum = Math.floor(i/that.ratio);
-        return (rowNum/that.numRows) * that.height;
-      });
-    };
+    this.charts = this.data.map(function(data) {  return new Chart(that, data); });
 
     this.initialize();
 
@@ -155,11 +126,33 @@
   FlowFacets.prototype = new Facets();
 
 
+  FlowFacets.prototype.xRange = function() {
+    var that = this;
+    return this.x.domain.map(function(d, i) {
+      if (that.x.domain.length < that.ratio) { return i * (that.width/that.x.domain.length); }
+      var colNum = i % that.ratio;
+      return (colNum/that.numCols) * that.width; 
+    });
+  };
+
+
+  FlowFacets.prototype.yRange = function() {
+    var that = this;
+    return this.y.domain.map(function(d, i) {
+      var rowNum = Math.floor(i/that.ratio);
+      return (rowNum/that.numRows) * that.height;
+    });
+  };
+
+
+
+
   function GridFacets(graphic) {
 
     var that = this;
 
     this.graphic = graphic;
+
     this.xField = graphic.params.facets.grid.x;
     this.yField = graphic.params.facets.grid.y;
 
@@ -168,11 +161,7 @@
       .key(function(row){ return row[that.yField]; })
       .entries(graphic.data);
 
-
-    this.initialize();
-
   }
-
 
   GridFacets.prototype = new Facets();
 
@@ -183,23 +172,40 @@
 
 
   function Scale() {
-    this.graphic;
     this.data;
     this.scale;
     this.domain;
   }
 
 
-  function CategoricalScale(graphic, data) {
-    this.graphic = graphic;
+  // ===================
+  // SCALES: CATEGORICAL
+  // ===================
+
+
+  function CategoricalScale(data, key) {
     this.data = data;
     this.scale = d3.scale.ordinal();
-    this.domain = data.map(function(category) { return category.key; });
+    this.domain = data.map(function(row) { return row[key]; });
     this.scale.domain(this.domain);
   }
 
-
   CategoricalScale.prototype = new Scale();
+
+
+  // ==============
+  // SCALES: LINEAR
+  // ==============
+
+
+  function LinearScale(data, key) {
+    this.data = data;
+    this.scale = d3.scale.linear();
+    this.domain = d3.extent( data.map(function(row) { return row[key]; }) );
+    this.scale.domain(this.domain);
+  }
+
+  LinearScale.prototype = new Scale();
 
 
   // ======
@@ -207,38 +213,23 @@
   // ======
 
 
-
   function Chart(facets, data) {
+
+    var that = this;
 
     this.facets = facets;
     this.key = data.key;
     this.data = data.values;
 
-    // Chart layers consist of a geometry ("line", "bar", "point") 
-    // and mappings that relate data fields (e.g. "month", "frequency")
-    // to aesthetics (e.g. "x", "color").
-
-    this.initialize();
+    var layerOpts = facets.graphic.params.layers || [];
+    this.layers = layerOpts.map(function(opts) { return new Layer(that, opts); });
 
   }
 
 
-  Chart.prototype.initialize = function() {};
-
-
-  // Calculate chart dimensions from facet dimensions.
   Chart.prototype.onRender = function() {
-
-    var numCharts = this.facets.charts.length;
-    var ratio = this.facets.ratio;
-
-    var numRows = ratio >= 1 ?  Math.ceil(numCharts/ratio) : Math.ceil(ratio/numCharts);
-    var numCols = Math.ceil(numCharts/numRows);
-
-
-    this.width = this.facets.width/numCols;
-    this.height = this.facets.height/numRows;
-
+    this.width = this.facets.width / this.facets.numCols;
+    this.height = this.facets.height / this.facets.numRows;
   };
 
 
@@ -247,24 +238,35 @@
   // ======
 
 
-  function Layer(opts) {
+  function Layer(chart, opts) {
 
-    this.geometry = undefined;
+    this.chart = chart;
+    this.data = chart.data;
 
-    // ================================================================
-    // Mapping relates a field in the dataset to an aesthetic (visible
-    // attribute) in the graphic. Most commonly this includes x and y
-    // coordinates. Can also include color, size, alpha, etc.
+    this.mapping = opts.mapping || {};
+    this.scale = {};
+    this.x = new LinearScale(this.data, this.mapping.x);
+    this.y = new LinearScale(this.data, this.mapping.y);
 
-    this.mapping = {};
+    if (opts.geometry === 'point') {
+      this.geometry = new PointGeometry(this);
+    }
 
-    // Type of scale will be determined automagically based on the
-    // aesthetic and the data type, but can also be specified by
-    // the user.
+    else {
+      this.geometry = new PointGeometry(this);
+    }
 
-    this.scales = {};
+    this.xRange = function() { return [0, this.chart.width]; };
+    this.yRange = function() { return [this.chart.height, 0]; };
 
   }
+
+
+  Layer.prototype.onRender = function() {
+    this.x.scale.range(this.xRange());
+    this.y.scale.range(this.yRange());
+  };
+
 
 
   // ==========
@@ -272,19 +274,28 @@
   // ==========
 
 
-  // Geometry sets the shape or path that represents a value.
-  // A "point" geometry forms a scatterplot, "bar" a bar chart, etc.
-
   function Geometry() {}
 
 
-  function PointGeometry(opts) {
+  Geometry.prototype.onRender = function() {};
 
-    this.x     = opts.x     || 0;
-    this.y     = opts.y     || 0;
-    this.color = opts.color || 'black';
-    this.size  = opts.size  || 3;
-    this.alpha = opts.alpha || 1;
+
+  // =================
+  // GEOMETRIES: POINT
+  // =================
+
+
+  function PointGeometry(layer) {
+
+    var that = this;
+
+    this.layer = layer;
+    this.type = 'point';
+
+    // Nest data by "group" mapping.
+    this.data = d3.nest()
+      .key(function(row){ return row[that.layer.mapping.group]; })
+      .entries(layer.data);
 
   }
 
@@ -299,7 +310,7 @@
 
   Graphic.prototype.render = function(el, width, height) {
 
-    if (this.onRender) { this.onRender(); }
+    this.onRender();
 
     // If width and height are given, draw facets to those dimensions.
     // Otherwise set to the current dimensions of the element.
@@ -318,7 +329,8 @@
 
     this.el
       .attr('width', this.width)
-      .attr('height', this.height);
+      .attr('height', this.height)
+      .attr('class', 'graphic');
 
     this.facets.render();
 
@@ -346,7 +358,9 @@
       .attr('transform', function(chart) { 
         return 'translate(' + that.x.scale(chart.key) + ',' + that.y.scale(chart.key) + ')'; 
       })
-      .each(function(chart, index) { chart.render(this, index); });
+      .each(function(chart, index) { 
+        chart.render(this, index); 
+      });
 
   };
 
@@ -363,13 +377,64 @@
     var that = this;
 
     this.el = d3.select(el);
+    this.el.selectAll('g.layers')
+      .data(this.layers)
+      .enter()
+      .append('g')
+      .attr('class', 'layers')
+      .each(function(layer, index) { 
+        layer.render(this, index); 
+      });
+
+  };
+
+
+  // =============
+  // RENDER LAYERS
+  // =============
+
+
+  Layer.prototype.render = function(el, index) {
+
+    this.onRender();
+
+    var that = this;
+
+    this.el = d3.select(el).append('g').attr('class', 'layer');
     this.el
-      .append('rect')
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .style('fill', 'none')
-      .style('stroke-width', 2)
-      .style('stroke', 'black')
+      .attr('data-geometry', function(d){ return d.geometry.type; });
+
+    this.geometry.render(this.el);
+
+  };
+
+
+  // =====================
+  // RENDER POINT GEOMETRY
+  // =====================
+
+
+  PointGeometry.prototype.render = function(el) {
+
+    var that = this;
+    this.el = el;
+
+    var groups = this.el.selectAll('g.group')
+      .data(this.data)
+      .enter()
+      .append('g')
+      .attr('class', 'group')
+      .attr('data-group', function(group){ return group.key; });
+
+    groups.selectAll('circle')
+      .data(function(group) { return group.values; })
+      .enter()
+      .append('circle')
+      .attr('cx', function(row) { return that.layer.x.scale(row[that.layer.mapping.x]); })
+      .attr('cy', function(row) { return that.layer.y.scale(row[that.layer.mapping.y]); })
+      .attr('r', 3)
+      .attr('fill', 'black')
+      .attr('stroke', 'none');
 
   };
 

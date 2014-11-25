@@ -19,7 +19,9 @@
   ],
   "dependencies": {
     "d3": "~3.4.13",
-    "underscore": "~1.7.0",
+    "underscore": "~1.7.0"
+  },
+  "devDependencies": {
     "mocha": "~2.0.1",
     "chai": "~1.10.0"
   }

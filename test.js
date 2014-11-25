@@ -53,7 +53,6 @@ describe('Render', function() {
     var el = addDiv();
     var graphic = addGraphic(el);
     expect(el.selectAll('svg .facet').size()).to.equal(1);
-    expect(el.selectAll('svg .facet').selectAll('*').empty()).to.be.true;
   });
 
 
@@ -76,7 +75,7 @@ describe('Facets', function() {
   });
 
 
-  it.only('creates a facet group for each key specified by the floating facet', function() {
+  it('creates a facet group for each key specified by the facet mapping (float)', function() {
     var el = addDiv();
     var params = {
       facets: { flow: 'country' }, 
@@ -84,6 +83,16 @@ describe('Facets', function() {
     };
     var graphic = addGraphic(el, data.threeDimensional, params);
     expect(el.selectAll('svg .facet').size()).to.equal(2);
+  });
+
+
+  it('creates a layer group for each key specified by the group mapping', function() {
+    var el = addDiv();
+    var params = {
+      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country', group: 'country' } }] 
+    };
+    var graphic = addGraphic(el, data.threeDimensional, params);
+    expect(el.selectAll('svg .facet').size()).to.equal(1);
   });
 
 });
