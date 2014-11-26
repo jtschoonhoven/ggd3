@@ -49,7 +49,7 @@ var expect = chai.expect;
 
 describe('Facets', function() {
 
-  it.only('creates a facet group for each key specified by the facet mapping (float)', function() {
+  it('creates a facet group for each key specified by the facet mapping (float)', function() {
     var el = addDiv();
     var params = {
       facets: { flow: 'country' }, 
@@ -63,6 +63,7 @@ describe('Facets', function() {
   it('creates a layer group for each key specified by the group mapping', function() {
     var el = addDiv();
     var params = {
+      facets: {},
       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country', group: 'country' } }] 
     };
     var graphic = addGraphic(el, data.threeDimensional, params);

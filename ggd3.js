@@ -30,6 +30,7 @@
 
     var that = this;
     this.opts = opts;
+    this.data = data || [];
 
     if (this.opts.facets.x || this.opts.facets.y) {
 
@@ -68,21 +69,41 @@
 
   function Facet(data, index, graphic) {
     _.extend(this, data);
+    var that = this;
     this.index = index;
     this.graphic = graphic;
-    this.layers = _.map(graphic.opts.layers, function(opts) { return new Layer(opts); });
+    this.layers = _.map(graphic.opts.layers, function(opts, index) { return new Layer(opts, index, that, graphic); });
   }
 
 
-  // =====
-  // LAYER
-  // =====
+  // ======
+  // LAYERS
+  // ======
 
 
-  function Layer(opts) {
+  function Layer(opts, index, facet, graphic) {
     _.extend(this, opts);
-    _.defaults(this, { geometry: 'point', mapping: {} });
+    var that    = this;
+    this.facet  = facet;
+    this.index  = index;
+    this.graphic = graphic;
+    var groups  = d3.nest().key(function(row) { return row[that.mapping.group]; }).entries(facet.values);
+    this.groups = _.map(groups, function(data, index) {
+      return new PointGroup(data, index, that, graphic);
+    });
+  }
 
+
+  // ============
+  // GROUP: POINT
+  // ============
+
+
+  function PointGroup(data, index, layer, graphic) {
+    _.extend(this, data);
+    this.index = index;
+    this.layer = layer;
+    this.graphic = graphic;
   }
 
 
@@ -150,22 +171,50 @@
       .enter()
       .append('g')
       .attr('class', 'layer')
-      .each(function(group, index) { 
-        group.render(this, index); 
+      .attr('data-geometry', function(opts) { return opts.geometry; })
+      .each(function(layer, index) {
+        layer.render(this, index); 
       });
 
   };
 
 
   // ==============
-  // RENDER: GROUPS
+  // RENDER: LAYERS
   // ==============
 
 
-  Group.prototype.render = function(el) {
-
+  Layer.prototype.render = function(el, index) {
     var that = this;
     this.el = d3.select(el);
+    this.el.selectAll('g.group')
+      .data(this.groups)
+      .enter()
+      .append('g')
+      .attr('class', 'group')
+      .attr('data-group', function(group) { return group.key; })
+      .each(function(group, index) {
+        group.render(this, index);
+      });
+  };
+
+
+  // =====================
+  // RENDER: GROUPS: POINT
+  // =====================
+
+
+  PointGroup.prototype.render = function(el, index) {
+    var that = this;
+    this.el = d3.select(el);
+    this.el.selectAll('circle.point')
+      .data(this.values)
+      .enter()
+      .append('circle')
+      .attr('class', 'point')
+      .attr('data-value', function(row) { return row[that.layer.mapping.y]; })
+      .attr('data-x', function(row) { return row[that.layer.mapping.x]; })
+      .attr('cx', function(row) { return that.graphic.scales.layer.x(row[that.layer.mapping.y]); });
 
   };
 
@@ -221,9 +270,7 @@
   }
 
 
-  function setRangeGrid(width, height) {
-
-  }
+  function setRangeGrid(width, height) {}
 
 
   function LayersScale(graphic) {}
