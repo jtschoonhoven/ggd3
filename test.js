@@ -29,14 +29,11 @@ if (typeof module !== 'undefined' && module.exports) {
 // CONVENIENCE FUNCTIONS
 // =====================
 
+var i = 0;
 
 function addDiv() {
-  return d3.select('.container').append('div').attr('class', 'example');
-}
-
-function addGraphic(el, data, params, width, height) {
-  var graphic = new Graphic(data, params);
-  return graphic.render(el, width, height);
+  d3.select('.container').append('div').attr('class', 'example').attr('id', 'example-' + ++i);
+  return '#example-' + i;
 }
 
 
@@ -51,22 +48,22 @@ describe('Facets', function() {
 
   it('creates a facet group for each key specified by the facet mapping (float)', function() {
     var el = addDiv();
-    var params = {
-      graphic: { flow: 'country' }, 
+    var opts = {
+      facets: { flow: 'country' }, 
       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
     };
-    var graphic = addGraphic(el, data.threeDimensional, params);
+    var graphic = new Graphic(opts, data.threeDimensional, el);
     expect(el.selectAll('svg .facet').size()).to.equal(2);
   });
 
 
   it('creates a layer group for each key specified by the group mapping', function() {
     var el = addDiv();
-    var params = {
-      graphic: {},
+    var opts = {
+      facets: {},
       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country', group: 'country' } }] 
     };
-    var graphic = addGraphic(el, data.threeDimensional, params);
+    var graphic = new Graphic(opts, data.threeDimensional, el);
     expect(el.selectAll('svg .facet').size()).to.equal(1);
   });
 
