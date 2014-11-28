@@ -46,14 +46,19 @@
 
   Graphic.prototype.setup = function(opts) {
     _.defaults(opts || {}, { facets: {}, layers: [] });
-    this.facetsController = new FacetsController(opts);
+    this.geometriesController = new GeometriesController(opts);
+    this.layersController = new LayersController(opts, this.geometriesController);
+    this.facetsController = new FacetsController(opts, this.layersController);
   };
 
 
-  Graphic.prototype.data = function(data) {
-    if (!_.isArray(data)) { return this.data || []; }
-    this.data = data;
-    this.facetsController.applyData(data);
+  Graphic.prototype.data = function(dataset) {
+    if (!_.isArray(dataset)) { return this.dataset || []; }
+    this.dataset = dataset;
+    this.facetsController.train(dataset);
+    this.layersController.train(dataset);
+    this.geometriesController.train(dataset);
+    this.facetsController.nest(dataset);
   };
 
 
@@ -94,30 +99,34 @@
   }
 
 
-  function FacetsController(opts) {
+  function FacetsController(opts, layersController) {
     _.extend(this, facetsDefaults, opts.facets);
     if (this.gridX || this.gridY) { _.extend(this, new GridFacetController()); }
     else { _.extend(this, new FlowFacetController()); }
-    this.layersController = new LayersController(opts);
-    this.facets = [];
+    this.layersController = layersController;
     this.scale = { x: d3.scale.ordinal(), y: d3.scale.ordinal(), domain: [] };
+    this.facets = [];
   }
 
 
   function FlowFacetController() {
 
-    this.applyData = function(data) {
+    this.train = function(dataset) {
+      var that = this;
+      this.scale.domain = d3.set(dataset.map(function(row) { return row[that.flow]; })).values();
+    };
+
+    this.nest = function(dataset) {
 
       var that = this;
 
       var facets = d3.nest()
         .key(function(row) { return row[that.flow]; })
-        .entries(data);
+        .entries(dataset);
 
       facets.forEach(function(facet, index) {
         var facet = new Facet(facet);
         that.layersController.applyData(facet);
-        that.scale.domain.push(index);
         that.facets.push(facet);
       });
 
@@ -125,7 +134,7 @@
 
     this.setRangeX = function(width, height, ratio, numFacets, numCols) {
       var that = this;
-      var xRange = this.scale.domain.map(function(index) {
+      var xRange = this.scale.domain.map(function(key, index) {
         if (numFacets < ratio) { return index * (width/numFacets); }
         var colNum = index % ratio;
         return (colNum/numCols) * that.width; 
@@ -134,7 +143,7 @@
     };
 
     this.setRangeY = function(width, height, ratio, numFacets, numRows) {
-      var yRange = this.scale.domain.map(function(index) {
+      var yRange = this.scale.domain.map(function(key, index) {
         var rowNum = Math.floor(index/ratio);
         return (rowNum/numRows) * height;
       });
@@ -192,19 +201,22 @@
   }
 
 
-  function LayersController(opts) {
+  function LayersController(opts, geometriesController) {
     opts.layers.forEach(function(layerOpts) { _.defaults(layerOpts, layerDefaults); });
     this.layersOptions = opts.layers;
     this.layers = [];
-    this.GeometriesController = new GeometriesController(opts);
+    this.geometriesController = geometriesController;
   }
+
+
+  LayersController.prototype.train = function(dataset) {};
 
 
   LayersController.prototype.applyData = function(facet) {
     var that = this;
     this.layersOptions.forEach(function(layerOpts) {
       var layer = new Layer(facet, layerOpts);
-      that.GeometriesController.applyData(layer);
+      that.geometriesController.applyData(layer);
       that.layers.push(layer);
     });
   };
@@ -220,7 +232,7 @@
       .attr('class', 'layer')
       .attr('data-geometry', function(layer) { return layer.geometry; })
       .each(function(layer) {
-        that.GeometriesController.applyElement(layer, this);
+        that.geometriesController.applyElement(layer, this);
       });
   };
 
@@ -244,6 +256,9 @@
     _.extend(this, geometriesDefaults);
     this.groups = [];
   };
+
+
+  GeometriesController.prototype.train = function(dataset) {};
 
 
   GeometriesController.prototype.applyData = function(layer) {
