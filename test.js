@@ -5,10 +5,6 @@
 
 if (typeof module !== 'undefined' && module.exports) {
 
-  // Create a fake DOM.
-  document = require('jsdom').jsdom();
-  window = document.parentWindow;
-
   d3 = require('d3');
   _  = require('underscore');
 
@@ -32,7 +28,8 @@ if (typeof module !== 'undefined' && module.exports) {
 var i = 0;
 
 function addDiv() {
-  d3.select('.container').append('div').attr('class', 'example').attr('id', 'example-' + ++i);
+  i++;
+  d3.select('.container').append('div').attr('class', 'example').attr('id', 'example-' + i);
   return '#example-' + i;
 }
 
@@ -52,8 +49,8 @@ describe('Facets', function() {
       facets: { flow: 'country' }, 
       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
     };
-    var graphic = new Graphic(opts, data.threeDimensional, el);
-    expect(el.selectAll('svg .facet').size()).to.equal(2);
+    var graphic = new Graphic(opts, data.threeDimensional, el, null, null, true);
+    expect(d3.select(el).selectAll('svg .facet').size()).to.equal(2);
   });
 
 
@@ -63,8 +60,8 @@ describe('Facets', function() {
       facets: {},
       layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country', group: 'country' } }] 
     };
-    var graphic = new Graphic(opts, data.threeDimensional, el);
-    expect(el.selectAll('svg .facet').size()).to.equal(1);
+    var graphic = new Graphic(opts, data.threeDimensional, el, null, null, true);
+    expect(d3.select(el).selectAll('svg .facet').size()).to.equal(1);
   });
 
 });
