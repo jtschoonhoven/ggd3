@@ -215,9 +215,7 @@
 
 
   function LayersController(opts, geometriesController) {
-    opts.layers.forEach(function(layerOpts) { _.defaults(layerOpts, layerDefaults); });
-    this.layersOptions = opts.layers;
-    this.layers = opts.layers.forEach(function(layerOpts) { return new Layer(layerOpts); });
+    this.layers = opts.layers.map(function(layerOpts) { return new Layer(layerOpts); });
     this.geometriesController = geometriesController;
   }
 
@@ -229,21 +227,16 @@
 
 
   LayersController.prototype.nest = function(facet) {
-    var that = this;
-    this.layersOptions.forEach(function(layerOpts) {
-      var layer = new Layer(layerOpts);
-      // that.geometriesController.nest(layer);
-      that.layers.push(layer);
-    });
+    facet.layers = this.layers;
+    this.geometriesController.nest(facet);
   };
 
 
   LayersController.prototype.applyElement = function(facet, el) {
-    // console.log(this.layers)
     var that = this;
     this.el = d3.select(el);
     this.el.selectAll('g.layer')
-      .data(this.layers)
+      .data(facet.layers)
       .enter()
       .append('g')
       .attr('class', 'layer')
@@ -281,27 +274,22 @@
   GeometriesController.prototype.train = function(dataset) {};
 
 
-  GeometriesController.prototype.nest = function(layer) {
-
+  GeometriesController.prototype.nest = function(facet) {
     var that = this;
-    var groups = d3.nest().key(function(row) { return row[that.group]; }).entries(layer.values);
-
-    groups.forEach(function(data, index) {
-      var group = new Group(data);
-      that.groups.push(group);
+    facet.layers.forEach(function(layer) {
+      layer.groups = d3.nest().key(function(row) { return row[that.group]; }).entries(facet.values);
     });
-
   };
 
 
   GeometriesController.prototype.applyElement = function(layer, el) {
     this.el = d3.select(el);
     this.el.selectAll('g.group')
-      .data(this.groups)
+      .data(layer.groups)
       .enter()
       .append('g')
       .attr('class', 'group')
-      .attr('data-group', function(group) { return group.key; });
+      .attr('data-group', function(group) { console.log(group); return group.key; });
   };
 
 
