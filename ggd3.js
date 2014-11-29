@@ -37,20 +37,26 @@
   // All arguments are optional.
 
   function Graphic(opts, data, el, width, height, renderNow) {
-    if(opts)      { this.setup(opts); }
-    if(data)      { this.data(data); }
-    if(el)        { this.build(el, width, height); }
-    if(renderNow) { this.render(); }
-  }
 
-
-  Graphic.prototype.setup = function(opts) {
     _.defaults(opts || {}, { facets: {}, layers: [] });
+
     this.geometriesController = new GeometriesController(opts);
     this.layersController = new LayersController(opts, this.geometriesController);
     this.facetsController = new FacetsController(opts, this.layersController);
-  };
 
+    if(data)      { this.data(data); }
+    if(el)        { this.build(el, width, height); }
+    if(renderNow) { this.render(); }
+
+  }
+
+
+  Graphic.prototype.configure = function(opts) {
+    _.defaults(opts || {}, { facets: {}, layers: [] });
+    this.facetsController.configure(opts);
+    this.layersController.configure(opts);
+    this.geometriesController.configure(opts);
+  };
 
   Graphic.prototype.data = function(dataset) {
     if (!_.isArray(dataset)) { return this.dataset || []; }
@@ -100,13 +106,20 @@
 
 
   function FacetsController(opts, layersController) {
+
     _.extend(this, facetsDefaults, opts.facets);
+
     if (this.gridX || this.gridY) { _.extend(this, new GridFacetController()); }
     else { _.extend(this, new FlowFacetController()); }
+
     this.layersController = layersController;
     this.scale = { x: d3.scale.ordinal(), y: d3.scale.ordinal(), domain: [] };
     this.facets = [];
+
   }
+
+
+  FacetsController.prototype.configure = function(opts) {};
 
 
   function FlowFacetController() {
@@ -126,7 +139,7 @@
 
       facets.forEach(function(facet, index) {
         var facet = new Facet(facet);
-        that.layersController.applyData(facet);
+        that.layersController.nest(facet);
         that.facets.push(facet);
       });
 
@@ -196,33 +209,37 @@
   };
 
 
-  function Layer(facet, opts) {
-    _.extend(this, opts, facet);
+  function Layer(layerOpts) {
+    _.extend(this, layerDefaults, layerOpts);
   }
 
 
   function LayersController(opts, geometriesController) {
     opts.layers.forEach(function(layerOpts) { _.defaults(layerOpts, layerDefaults); });
     this.layersOptions = opts.layers;
-    this.layers = [];
+    this.layers = opts.layers.forEach(function(layerOpts) { return new Layer(layerOpts); });
     this.geometriesController = geometriesController;
   }
+
+
+  LayersController.prototype.configure = function(opts) {};
 
 
   LayersController.prototype.train = function(dataset) {};
 
 
-  LayersController.prototype.applyData = function(facet) {
+  LayersController.prototype.nest = function(facet) {
     var that = this;
     this.layersOptions.forEach(function(layerOpts) {
-      var layer = new Layer(facet, layerOpts);
-      that.geometriesController.applyData(layer);
+      var layer = new Layer(layerOpts);
+      // that.geometriesController.nest(layer);
       that.layers.push(layer);
     });
   };
 
 
   LayersController.prototype.applyElement = function(facet, el) {
+    // console.log(this.layers)
     var that = this;
     this.el = d3.select(el);
     this.el.selectAll('g.layer')
@@ -258,10 +275,13 @@
   };
 
 
+  GeometriesController.prototype.configure = function(opts) {};
+
+
   GeometriesController.prototype.train = function(dataset) {};
 
 
-  GeometriesController.prototype.applyData = function(layer) {
+  GeometriesController.prototype.nest = function(layer) {
 
     var that = this;
     var groups = d3.nest().key(function(row) { return row[that.group]; }).entries(layer.values);
