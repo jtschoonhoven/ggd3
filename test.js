@@ -47,7 +47,7 @@ describe('Facets', function() {
     var el = addDiv();
     var opts = {
       facets: { flow: 'country' }, 
-      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }] 
+      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }]
     };
     var graphic = new Graphic(opts, data.threeDimensional, el, null, null, true);
     expect(d3.select(el).selectAll('svg .facet').size()).to.equal(2);
