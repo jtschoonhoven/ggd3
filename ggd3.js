@@ -29,8 +29,9 @@
 
 
   function Graphic(opts, data, el, width, height, renderNow) {
-    _.defaults(opts || {}, { facets: {}, layers: [] });
-    this.groupsController = new GroupsController();
+    _.defaults(opts || {}, { facets: {}, layers: [], groups: [], geometries: [] });
+    this.geometriesController = new GeometriesController();
+    this.groupsController = new GroupsController(this.geometriesController);
     this.layersController = new LayersController(this.groupsController);
     this.facetsController = new FacetsController(this.layersController);
     if(opts)      { this.configure(opts); }
@@ -41,10 +42,11 @@
 
 
   Graphic.prototype.configure = function(opts) {
-    _.defaults(opts || {}, { graphic: {}, facets: {}, layers: [], groups: [] });
-    this.facetsController.configure(opts);
-    this.layersController.configure(opts);
-    this.groupsController.configure(opts);
+    opts = _.defaults(opts || {}, { graphic: {}, facets: {}, layers: [], groups: [] });
+    opts.facets = this.facetsController.configure(opts);
+    opts.layers = this.layersController.configure(opts);
+    opts.groups = this.groupsController.configure(opts);
+    opts.geometries = this.geometriesController.configure(opts);
   };
 
 
@@ -102,6 +104,7 @@
     this.opts = _.extend({}, facetsDefaults, opts.graphic, opts.facets);
     if (this.opts.gridX || this.opts.gridY) { _.extend(this, new GridFacetController()); }
     else { _.extend(this, new FlowFacetController()); }
+    return this.opts;
   };
 
 
@@ -205,7 +208,8 @@
 
   LayersController.prototype.configure = function(opts) {
     if (!opts.layers.length > 0) { opts.layers[0] = _.extend({}, layerDefaults, opts.graphic); }
-    this.layersOpts = opts.layers.map(function(layerOpts) { return _.extend({}, layerDefaults, opts.graphic, layerOpts); });
+    this.opts = opts.layers.map(function(layerOpts) { return _.extend({}, layerDefaults, opts.graphic, layerOpts); });
+    return this.opts;
   };
 
 
@@ -214,7 +218,7 @@
 
   LayersController.prototype.nest = function(facet) {
     var that = this;
-    var layers = this.layersOpts.map(function(layerOpts, index) {
+    var layers = this.opts.map(function(layerOpts, index) {
       var layer = { opts: layerOpts, values: facet.values, index: index };
       layer.groups = that.groupsController.nest(layer);
       return new Layer(layer);
@@ -248,14 +252,22 @@
   };
 
 
-  function GroupsController() {};
+  function Geometry(data) {
+    console.log('new geo');
+  }
+
+
+  function GroupsController(geometriesController) {
+    this.geometriesController = geometriesController;
+  }
 
 
   GroupsController.prototype.configure = function(opts) {
     if (!opts.groups.length > 0) { opts.groups = opts.layers.map(function(layer) { return _.extend(layer, groupsDefaults); }); }
-    this.groupsOpts = opts.groups.map(function(groupOpts, index) { 
+    this.opts = opts.groups.map(function(groupOpts, index) { 
       return _.extend({}, groupsDefaults, opts.graphic, opts.facets, opts.layers[index], groupOpts); 
     });
+    return this.opts;
   };
 
 
@@ -268,9 +280,8 @@
       .key(function(row) { return row[layer.opts.mapping.group]; })
       .entries(layer.values)
       .map(function(group) {
-        group.opts = that.groupsOpts[layer.index];
-        console.log(group)
-        // To geometries.
+        group.opts = that.opts[layer.index];
+        return that.geometriesController.create(group);
       });
     return groups;
   };
@@ -284,7 +295,9 @@
       .enter()
       .append('g')
       .attr('class', 'group')
-      .attr('data-group', function(group) { return group.key; })
+      .attr('data-group', function(group) {
+        // ok
+      })
       .each(function(group) {
 
       });
@@ -297,7 +310,24 @@
   // ========
 
 
-  function GeometryController() {}
+  var geometriesDefaults = {};
+
+
+  function GeometriesController() {}
+
+
+  GeometriesController.prototype.configure = function(opts) {
+    if (!opts.geometries.length > 0) { opts.geometries = opts.groups.map(function(groupOpts) { return _.extend(groupOpts, geometriesDefaults); }); }
+    this.opts = opts.geometries.map(function(geometriesOpts, index) {
+      return _.extend({}, geometriesDefaults, opts.graphic, opts.facets, opts.layers[index], opts.groups[index], geometriesOpts); 
+    });
+    return this.opts;
+  };
+
+
+  GeometriesController.prototype.create = function(group) {
+    console.log(group)
+  };
 
 
   // =============
