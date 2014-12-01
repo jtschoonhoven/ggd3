@@ -11,7 +11,6 @@
 
   var isNode = false;
 
-  // If Node, create a fake DOM with jsdom and require dependencies.
   if (typeof module !== 'undefined' && module.exports) {
     isNode = true;
     document = require('jsdom').jsdom();
@@ -21,6 +20,11 @@
   }
 
   if (!d3 || !_) { throw 'ggd3 requires D3 and Underscore.'; }
+
+
+  // =======
+  // GRAPHIC
+  // =======
 
 
   function Graphic(opts, data, el, width, height, renderNow) {
@@ -126,9 +130,12 @@
   }
 
 
-  // =========
-  // CONFIGURE
-  // =========
+  function GeometriesController() {}
+
+
+  // ========
+  // DEFAULTS
+  // ========
 
 
   var facetsDefaultOpts = {
@@ -147,6 +154,14 @@
   var groupDefaultOpts = {
     group: undefined
   };
+
+
+  var geometriesDefaults = {};
+
+
+  // =========
+  // CONFIGURE
+  // =========
 
 
   Graphic.prototype.configure = function(opts) {
@@ -182,6 +197,15 @@
   };
 
 
+  GeometriesController.prototype.configure = function(opts) {
+    if (!opts.geometries.length > 0) { opts.geometries = opts.groups.map(function(groupOpts) { return _.extend(groupOpts, geometriesDefaults); }); }
+    this.opts = opts.geometries.map(function(geometriesOpts, index) {
+      return _.extend({}, geometriesDefaults, opts.graphic, opts.facets, opts.layers[index], opts.groups[index], geometriesOpts); 
+    });
+    return this.opts;
+  };
+
+
   // =========
   // CALCULATE
   // =========
@@ -208,7 +232,34 @@
   };
 
 
+  GroupsController.prototype.calculate = function(layer) {
+    var that = this;
+    var groups = d3.nest()
+      .key(function(row) { return row[layer.opts.mapping.group]; })
+      .entries(layer.values)
+      .map(function(group) {
+        group.opts = that.opts[layer.index];
+        return that.geometriesController.calculate(group);
+      });
+    return groups;
+  };
+
+
+  GeometriesController.prototype.calculate = function(group) {
+    console.log(group)
+  };
+
+
+
+  // =====
+  // TRAIN
+  // =====
+
+
   LayersController.prototype.train = function(dataset) {};
+
+
+  GroupsController.prototype.train = function(dataset) {};
 
 
   // ====
@@ -273,28 +324,6 @@
   };
 
 
-  // ======
-  // GROUPS
-  // ======
-
-
-
-  GroupsController.prototype.train = function(dataset) {};
-
-
-  GroupsController.prototype.calculate = function(layer) {
-    var that = this;
-    var groups = d3.nest()
-      .key(function(row) { return row[layer.opts.mapping.group]; })
-      .entries(layer.values)
-      .map(function(group) {
-        group.opts = that.opts[layer.index];
-        return that.geometriesController.create(group);
-      });
-    return groups;
-  };
-
-
   GroupsController.prototype.draw = function(layer, el) {
     var that = this;
     this.el = d3.select(el);
@@ -303,38 +332,10 @@
       .enter()
       .append('g')
       .attr('class', 'group')
-      .attr('data-group', function(group) {
-        // ok
-      })
+      .attr('data-group', function(group) {})
       .each(function(group) {
-
+        // ok
       });
-  };
-
-
-
-  // ========
-  // GEOMETRY
-  // ========
-
-
-  var geometriesDefaults = {};
-
-
-  function GeometriesController() {}
-
-
-  GeometriesController.prototype.configure = function(opts) {
-    if (!opts.geometries.length > 0) { opts.geometries = opts.groups.map(function(groupOpts) { return _.extend(groupOpts, geometriesDefaults); }); }
-    this.opts = opts.geometries.map(function(geometriesOpts, index) {
-      return _.extend({}, geometriesDefaults, opts.graphic, opts.facets, opts.layers[index], opts.groups[index], geometriesOpts); 
-    });
-    return this.opts;
-  };
-
-
-  GeometriesController.prototype.create = function(group) {
-    console.log(group)
   };
 
 
