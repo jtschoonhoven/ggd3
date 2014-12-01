@@ -59,11 +59,6 @@
   }
 
 
-  function Geometry(data) {
-    // console.log('new geo');
-  }
-
-
   // ===========
   // CONTROLLERS
   // ===========
@@ -176,15 +171,20 @@
 
   FacetsController.prototype.calculate = function(dataset) {
     var that = this;
-    var facets = d3.nest()
-      .key(function(row) { return row[that.opts.flow]; })
-      .entries(dataset)
-      .map(function(facet, index) {
-        var facet = { opts: that.opts, values: facet.values, index: index };
-        facet.layers = that.layersController.calculate(facet);
-        return new Facet(facet);
-    });
-    return facets;
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('CALCULATE FOR GRID');
+    }
+    else {
+      var facets = d3.nest()
+        .key(function(row) { return row[that.opts.flow]; })
+        .entries(dataset)
+        .map(function(facet, index) {
+          var facet = { opts: that.opts, values: facet.values, index: index };
+          facet.layers = that.layersController.calculate(facet);
+          return new Facet(facet);
+      });
+      return facets;
+    }
   };
 
 
@@ -213,9 +213,24 @@
 
 
   GeometriesController.prototype.calculate = function(group) {
-    // console.log(group)
+    return new { point: PointGeometry }[group.opts.geometry](group);
   };
 
+
+
+  // ==========
+  // GEOMETRIES
+  // ==========
+
+
+  function Geometry() {}
+
+
+  function PointGeometry(data) {
+    this.key = data.key;
+    this.opts = data.opts;
+    this.values = data.values;
+  }
 
 
   // =====
@@ -242,21 +257,31 @@
 
   FacetsController.prototype.setRangeX = function(width, height, ratio, numFacets, numCols) {
     var that = this;
-    var xRange = this.scale.domain.map(function(key, index) {
-      if (numFacets < ratio) { return index * (width/numFacets); }
-      var colNum = index % ratio;
-      return (colNum/numCols) * that.width; 
-    });
-    this.scale.x.range(xRange);
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('SET GRID RANGE X');
+    }
+    else {
+      var xRange = this.scale.domain.map(function(key, index) {
+        if (numFacets < ratio) { return index * (width/numFacets); }
+        var colNum = index % ratio;
+        return (colNum/numCols) * that.width; 
+      });
+      this.scale.x.range(xRange);
+    }
   };
 
 
   FacetsController.prototype.setRangeY = function(width, height, ratio, numFacets, numRows) {
-    var yRange = this.scale.domain.map(function(key, index) {
-      var rowNum = Math.floor(index/ratio);
-      return (rowNum/numRows) * height;
-    });
-    this.scale.y.range(yRange);
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('SET GRID RANGE Y');
+    }
+    else {
+      var yRange = this.scale.domain.map(function(key, index) {
+        var rowNum = Math.floor(index/ratio);
+        return (rowNum/numRows) * height;
+      });
+      this.scale.y.range(yRange);
+    }
   };
 
 
@@ -330,10 +355,14 @@
       .enter()
       .append('g')
       .attr('class', 'group')
-      .attr('data-group', function(group) {})
-      .each(function(group) {
-        // ok
+      .attr('data-group', function(geometry) { return geometry.key; })
+      .each(function(geometry) {
+        that.geometriesController.draw(geometry, this);
       });
+  };
+
+
+  GeometriesController.prototype.draw = function(geometry, el) {
   };
 
 
@@ -342,7 +371,9 @@
   // ======
 
 
-  Graphic.prototype.render = function() { this.target.html(this.el.html()); };
+  Graphic.prototype.render = function() { 
+    this.target.html(this.el.html()); 
+  };
 
 
   // =============
