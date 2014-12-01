@@ -75,54 +75,6 @@
   }
 
 
-  function GridFacetsController(layersController) {}
-
-
-  function FlowFacetsController() {
-
-
-    this.train = function(dataset) {
-      var that = this;
-      this.scale.domain = d3.set(dataset.map(function(row) { return row[that.opts.flow]; })).values();
-    };
-
-
-    this.calculate = function(dataset) {
-      var that = this;
-      var facets = d3.nest()
-        .key(function(row) { return row[that.opts.flow]; })
-        .entries(dataset)
-        .map(function(facet, index) {
-          var facet = { opts: that.opts, values: facet.values, index: index };
-          facet.layers = that.layersController.calculate(facet);
-          return new Facet(facet);
-      });
-      return facets;
-    };
-
-
-    this.setRangeX = function(width, height, ratio, numFacets, numCols) {
-      var that = this;
-      var xRange = this.scale.domain.map(function(key, index) {
-        if (numFacets < ratio) { return index * (width/numFacets); }
-        var colNum = index % ratio;
-        return (colNum/numCols) * that.width; 
-      });
-      this.scale.x.range(xRange);
-    };
-
-
-    this.setRangeY = function(width, height, ratio, numFacets, numRows) {
-      var yRange = this.scale.domain.map(function(key, index) {
-        var rowNum = Math.floor(index/ratio);
-        return (rowNum/numRows) * height;
-      });
-      this.scale.y.range(yRange);
-    };
-
-  }
-
-
   function LayersController(groupsController) {
     this.groupsController = groupsController;
   }
@@ -178,10 +130,6 @@
 
   FacetsController.prototype.configure = function(opts) {
     this.opts = _.extend({}, facetsDefaultOpts, opts.graphic, opts.facets);
-    if (this.opts.gridX || this.opts.gridY) {
-      
-    }
-    else { _.extend(this, new FlowFacetsController()); }
     return this.opts;
   };
 
@@ -226,6 +174,20 @@
   };
 
 
+  FacetsController.prototype.calculate = function(dataset) {
+    var that = this;
+    var facets = d3.nest()
+      .key(function(row) { return row[that.opts.flow]; })
+      .entries(dataset)
+      .map(function(facet, index) {
+        var facet = { opts: that.opts, values: facet.values, index: index };
+        facet.layers = that.layersController.calculate(facet);
+        return new Facet(facet);
+    });
+    return facets;
+  };
+
+
   LayersController.prototype.calculate = function(facet) {
     var that = this;
     var layers = this.opts.map(function(layerOpts, index) {
@@ -261,10 +223,41 @@
   // =====
 
 
+  FacetsController.prototype.train = function(dataset) {
+    var that = this;
+    this.scale.domain = d3.set(dataset.map(function(row) { return row[that.opts.flow]; })).values();
+  };
+
+
   LayersController.prototype.train = function(dataset) {};
 
 
   GroupsController.prototype.train = function(dataset) {};
+
+
+  // =========
+  // SET RANGE
+  // =========
+
+
+  FacetsController.prototype.setRangeX = function(width, height, ratio, numFacets, numCols) {
+    var that = this;
+    var xRange = this.scale.domain.map(function(key, index) {
+      if (numFacets < ratio) { return index * (width/numFacets); }
+      var colNum = index % ratio;
+      return (colNum/numCols) * that.width; 
+    });
+    this.scale.x.range(xRange);
+  };
+
+
+  FacetsController.prototype.setRangeY = function(width, height, ratio, numFacets, numRows) {
+    var yRange = this.scale.domain.map(function(key, index) {
+      var rowNum = Math.floor(index/ratio);
+      return (rowNum/numRows) * height;
+    });
+    this.scale.y.range(yRange);
+  };
 
 
   // ====
