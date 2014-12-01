@@ -41,6 +41,20 @@ function addDiv() {
 
 var expect = chai.expect;
 
+describe('Configure', function() {
+
+  it('opts defined in an upper level component cascade to lower level components', function() {
+    var opts = { 
+      graphic: { gridX: 'A', mapping: 'B' }, 
+      facets: { gridY: 'C', group: 'D' }, 
+      layers: [{ geometry: 'E' }, { geometry: 'F', mapping: 'G' }]
+    };
+    var graphic = new Graphic(opts);
+    console.log(opts);
+  });
+
+});
+
 describe('Facets', function() {
 
   it('creates a facet group for each key specified by the facet mapping (float)', function() {

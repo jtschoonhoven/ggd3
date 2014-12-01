@@ -21,11 +21,6 @@
   }
 
   if (!d3 || !_) { throw 'ggd3 requires D3 and Underscore.'; }
-  
-
-  // =======
-  // GRAPHIC
-  // =======
 
 
   function Graphic(opts, data, el, width, height, renderNow) {
@@ -35,55 +30,15 @@
     this.layersController = new LayersController(this.groupsController);
     this.facetsController = new FacetsController(this.layersController);
     if(opts)      { this.configure(opts); }
-    if(data)      { this.data(data); }
-    if(el)        { this.build(el, width, height); }
+    if(data)      { this.calculate(data); }
+    if(el)        { this.draw(el, width, height); }
     if(renderNow) { this.render(); }
   }
 
 
-  Graphic.prototype.configure = function(opts) {
-    opts = _.defaults(opts || {}, { graphic: {}, facets: {}, layers: [], groups: [] });
-    opts.facets = this.facetsController.configure(opts);
-    opts.layers = this.layersController.configure(opts);
-    opts.groups = this.groupsController.configure(opts);
-    opts.geometries = this.geometriesController.configure(opts);
-  };
-
-
-  Graphic.prototype.data = function(dataset) {
-    if (!_.isArray(dataset)) { return this.dataset || []; }
-    this.dataset = dataset;
-    this.facetsController.train(dataset);
-    this.layersController.train(dataset);
-    this.groupsController.train(dataset);
-    this.facets = this.facetsController.nest(dataset);
-  };
-
-
-  Graphic.prototype.build = function(el, width, height) {
-    if (!_.isString(el)) { return this.el; }
-    this.target = d3.select(el);
-    this.width  = width  || parseInt(this.target.style('width'));
-    this.height = height || parseInt(this.target.style('height'));
-    this.el = d3.select(document.createElement('div'));
-    this.el.append('svg').attr('width', this.width).attr('height', this.height).attr('class', 'graphic');
-    this.facetsController.build(this.facets, this.el, this.width, this.height);
-  };
-
-
-  Graphic.prototype.render = function() { this.target.html(this.el.html()); };
-
-
-  // ======
-  // FACETS
-  // ======
-
-
-  var facetsDefaults = {
-    flow: undefined,
-    gridX: undefined,
-    gridY: undefined
-  };
+  // ==========
+  // COMPONENTS
+  // ==========
 
 
   function Facet(data) {
@@ -94,18 +49,26 @@
   }
 
 
+  function Layer(data) {
+    this.opts = data.opts;
+    this.groups = data.groups;
+  }
+
+
+  function Geometry(data) {
+    console.log('new geo');
+  }
+
+
+  // ===========
+  // CONTROLLERS
+  // ===========
+
+
   function FacetsController(layersController) {
     this.scale = { x: d3.scale.ordinal(), y: d3.scale.ordinal(), domain: [] };
     this.layersController = layersController;
   }
-
-
-  FacetsController.prototype.configure = function(opts) {
-    this.opts = _.extend({}, facetsDefaults, opts.graphic, opts.facets);
-    if (this.opts.gridX || this.opts.gridY) { _.extend(this, new GridFacetController()); }
-    else { _.extend(this, new FlowFacetController()); }
-    return this.opts;
-  };
 
 
   function FlowFacetController() {
@@ -117,14 +80,14 @@
     };
 
 
-    this.nest = function(dataset) {
+    this.calculate = function(dataset) {
       var that = this;
       var facets = d3.nest()
         .key(function(row) { return row[that.opts.flow]; })
         .entries(dataset)
         .map(function(facet, index) {
           var facet = { opts: that.opts, values: facet.values, index: index };
-          facet.layers = that.layersController.nest(facet);
+          facet.layers = that.layersController.calculate(facet);
           return new Facet(facet);
       });
       return facets;
@@ -153,7 +116,118 @@
   }
 
 
-  FacetsController.prototype.build = function(facets, el, width, height) {
+  function LayersController(groupsController) {
+    this.groupsController = groupsController;
+  }
+
+
+  function GroupsController(geometriesController) {
+    this.geometriesController = geometriesController;
+  }
+
+
+  // =========
+  // CONFIGURE
+  // =========
+
+
+  var facetsDefaultOpts = {
+    flow: undefined,
+    gridX: undefined,
+    gridY: undefined
+  };
+
+
+  var layerDefaultOpts = {
+    geometry: 'point',
+    mapping: {}
+  };
+
+
+  var groupDefaultOpts = {
+    group: undefined
+  };
+
+
+  Graphic.prototype.configure = function(opts) {
+    this.opts = _.defaults(opts || {}, { graphic: {}, facets: {}, layers: [], groups: [] });
+    this.opts.facets = this.facetsController.configure(opts);
+    this.opts.layers = this.layersController.configure(opts);
+    this.opts.groups = this.groupsController.configure(opts);
+    this.opts.geometries = this.geometriesController.configure(opts);
+  };
+
+
+  FacetsController.prototype.configure = function(opts) {
+    this.opts = _.extend({}, facetsDefaultOpts, opts.graphic, opts.facets);
+    if (this.opts.gridX || this.opts.gridY) { _.extend(this, new GridFacetController()); }
+    else { _.extend(this, new FlowFacetController()); }
+    return this.opts;
+  };
+
+
+  LayersController.prototype.configure = function(opts) {
+    if (!opts.layers.length > 0) { opts.layers[0] = _.extend({}, layerDefaultOpts, opts.graphic); }
+    this.opts = opts.layers.map(function(layerOpts) { return _.extend({}, layerDefaultOpts, opts.graphic, layerOpts); });
+    return this.opts;
+  };
+
+
+  GroupsController.prototype.configure = function(opts) {
+    if (!opts.groups.length > 0) { opts.groups = opts.layers.map(function(layer) { return _.extend(layer, groupDefaultOpts); }); }
+    this.opts = opts.groups.map(function(groupOpts, index) { 
+      return _.extend({}, groupDefaultOpts, opts.graphic, opts.facets, opts.layers[index], groupOpts); 
+    });
+    return this.opts;
+  };
+
+
+  // =========
+  // CALCULATE
+  // =========
+
+
+  Graphic.prototype.calculate = function(dataset) {
+    if (!_.isArray(dataset)) { return this.dataset || []; }
+    this.dataset = dataset;
+    this.facetsController.train(dataset);
+    this.layersController.train(dataset);
+    this.groupsController.train(dataset);
+    this.facets = this.facetsController.calculate(dataset);
+  };
+
+
+  LayersController.prototype.calculate = function(facet) {
+    var that = this;
+    var layers = this.opts.map(function(layerOpts, index) {
+      var layer = { opts: layerOpts, values: facet.values, index: index };
+      layer.groups = that.groupsController.calculate(layer);
+      return new Layer(layer);
+    });
+    return layers;
+  };
+
+
+  LayersController.prototype.train = function(dataset) {};
+
+
+  // ====
+  // DRAW
+  // ====
+
+
+  Graphic.prototype.draw = function(el, width, height) {
+    if (!_.isString(el)) { return this.el; }
+    this.target = d3.select(el);
+    this.width  = width  || parseInt(this.target.style('width'));
+    this.height = height || parseInt(this.target.style('height'));
+    this.el = d3.select(document.createElement('div'));
+    this.el.append('svg').attr('width', this.width).attr('height', this.height).attr('class', 'graphic');
+    this.facetsController.draw(this.facets, this.el, this.width, this.height);
+  };
+
+
+  FacetsController.prototype.draw = function(facets, el, width, height) {
 
     var that = this;
 
@@ -178,56 +252,13 @@
         return 'translate(' + that.scale.x(facet.key) + ',' + that.scale.y(facet.key) + ')';
       })
       .each(function(facet, index) {
-        that.layersController.build(facet, this);
+        that.layersController.draw(facet, this);
       });
 
   };
 
 
-  // ======
-  // LAYERS
-  // ======
-
-
-  var layerDefaults = {
-    geometry: 'point',
-    mapping: {}
-  };
-
-
-  function Layer(data) {
-    this.opts = data.opts;
-    this.groups = data.groups;
-  }
-
-
-  function LayersController(groupsController) {
-    this.groupsController = groupsController;
-  }
-
-
-  LayersController.prototype.configure = function(opts) {
-    if (!opts.layers.length > 0) { opts.layers[0] = _.extend({}, layerDefaults, opts.graphic); }
-    this.opts = opts.layers.map(function(layerOpts) { return _.extend({}, layerDefaults, opts.graphic, layerOpts); });
-    return this.opts;
-  };
-
-
-  LayersController.prototype.train = function(dataset) {};
-
-
-  LayersController.prototype.nest = function(facet) {
-    var that = this;
-    var layers = this.opts.map(function(layerOpts, index) {
-      var layer = { opts: layerOpts, values: facet.values, index: index };
-      layer.groups = that.groupsController.nest(layer);
-      return new Layer(layer);
-    });
-    return layers;
-  };
-
-
-  LayersController.prototype.build = function(facet, el) {
+  LayersController.prototype.draw = function(facet, el) {
     var that = this;
     this.el = d3.select(el);
     this.el.selectAll('g.layer')
@@ -237,7 +268,7 @@
       .attr('class', 'layer')
       .attr('data-geometry', function(layer) { return layer.geometry; })
       .each(function(layer) {
-        that.groupsController.build(layer, this);
+        that.groupsController.draw(layer, this);
       });
   };
 
@@ -247,34 +278,11 @@
   // ======
 
 
-  var groupsDefaults = {
-    group: undefined
-  };
-
-
-  function Geometry(data) {
-    console.log('new geo');
-  }
-
-
-  function GroupsController(geometriesController) {
-    this.geometriesController = geometriesController;
-  }
-
-
-  GroupsController.prototype.configure = function(opts) {
-    if (!opts.groups.length > 0) { opts.groups = opts.layers.map(function(layer) { return _.extend(layer, groupsDefaults); }); }
-    this.opts = opts.groups.map(function(groupOpts, index) { 
-      return _.extend({}, groupsDefaults, opts.graphic, opts.facets, opts.layers[index], groupOpts); 
-    });
-    return this.opts;
-  };
-
 
   GroupsController.prototype.train = function(dataset) {};
 
 
-  GroupsController.prototype.nest = function(layer) {
+  GroupsController.prototype.calculate = function(layer) {
     var that = this;
     var groups = d3.nest()
       .key(function(row) { return row[layer.opts.mapping.group]; })
@@ -287,7 +295,7 @@
   };
 
 
-  GroupsController.prototype.build = function(layer, el) {
+  GroupsController.prototype.draw = function(layer, el) {
     var that = this;
     this.el = d3.select(el);
     this.el.selectAll('g.group')
@@ -328,6 +336,14 @@
   GeometriesController.prototype.create = function(group) {
     console.log(group)
   };
+
+
+  // ======
+  // RENDER
+  // ======
+
+
+  Graphic.prototype.render = function() { this.target.html(this.el.html()); };
 
 
   // =============
