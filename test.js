@@ -50,7 +50,7 @@ describe('Configure', function() {
       layers: [{ geometry: 'E' }, { geometry: 'F', mapping: 'G' }]
     };
     var graphic = new Graphic(opts);
-    console.log(opts);
+    // console.log(opts);
   });
 
 });

@@ -60,7 +60,7 @@
 
 
   function Geometry(data) {
-    console.log('new geo');
+    // console.log('new geo');
   }
 
 
@@ -75,7 +75,10 @@
   }
 
 
-  function FlowFacetController() {
+  function GridFacetsController(layersController) {}
+
+
+  function FlowFacetsController() {
 
 
     this.train = function(dataset) {
@@ -175,8 +178,10 @@
 
   FacetsController.prototype.configure = function(opts) {
     this.opts = _.extend({}, facetsDefaultOpts, opts.graphic, opts.facets);
-    if (this.opts.gridX || this.opts.gridY) { _.extend(this, new GridFacetController()); }
-    else { _.extend(this, new FlowFacetController()); }
+    if (this.opts.gridX || this.opts.gridY) {
+      
+    }
+    else { _.extend(this, new FlowFacetsController()); }
     return this.opts;
   };
 
@@ -246,7 +251,7 @@
 
 
   GeometriesController.prototype.calculate = function(group) {
-    console.log(group)
+    // console.log(group)
   };
 
 

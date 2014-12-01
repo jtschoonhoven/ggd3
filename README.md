@@ -37,3 +37,20 @@ And "opts" is a hash of options e.g.
   layers: [{ geometry: 'point', mapping: { x: 'year', y: 'units', group: 'version' }],
 }
 ```
+
+The process of rendering a graphic happens like so:
+
+*Setup*
+* Apply options to controllers and prepare them to accept data
+* Create scales (without domain or range yet)
+
+*Apply data*
+* Nest and reshape the data into a hierarchy of facets >> layers >> groups >> geometries
+* Train scales and statistics on data
+
+*Draw SVG*
+* Calculate scale ranges.
+* Walk down the hierarchy and assemble a SVG, not attached to the DOM.
+
+*Render*
+* Attach SVG to target element.
