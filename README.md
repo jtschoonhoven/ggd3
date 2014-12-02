@@ -23,10 +23,10 @@ var graphic = new Graphic(data, opts);
 Where "data" is an array of objects of name:value pairs, e.g. 
 
 ```json
-[{ "country": 'US', "year": "2013", "units": 10, "version": "1.2" }, 
- { "country": 'US', "year": "2014", "units": 20, "version": "1.3" },
- { "country": 'CA', "year": "2013", "units": 30, "version": "1.2" },
- { "country": 'CA', "year": "2014", "units": 20, "version": "1.3" }]
+[{ "country": "US", "year": "2013", "units": 10, "version": "1.2" }, 
+ { "country": "US", "year": "2014", "units": 20, "version": "1.3" },
+ { "country": "CA", "year": "2013", "units": 30, "version": "1.2" },
+ { "country": "CA", "year": "2014", "units": 20, "version": "1.3" }]
 ```
 
 And "opts" is a hash of options e.g.

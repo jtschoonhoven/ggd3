@@ -11,152 +11,211 @@
 
   var isNode = false;
 
-  // If Node, get dependencies, add to globals and export gg.
   if (typeof module !== 'undefined' && module.exports) {
     isNode = true;
+    document = require('jsdom').jsdom();
+    window = document.parentWindow;
     this.d3 = require('d3');
     this._  = require('underscore');
   }
 
-  if (!d3 || !_) { throw 'GGD3 requires D3 and Underscore.'; }
+  if (!d3 || !_) { throw 'ggd3 requires D3 and Underscore.'; }
+
+
+  // =======
+  // GRAPHIC
+  // =======
+
+
+  function Graphic(opts, data, el, width, height, renderNow) {
+    _.defaults(opts || {}, { facets: {}, layers: [], groups: [], geometries: [] });
+    this.geometriesController = new GeometriesController();
+    this.groupsController = new GroupsController(this.geometriesController);
+    this.layersController = new LayersController(this.groupsController);
+    this.facetsController = new FacetsController(this.layersController);
+    if(opts)      { this.configure(opts); }
+    if(data)      { this.calculate(data); }
+    if(el)        { this.draw(el, width, height); }
+    if(renderNow) { this.render(); }
+  }
+
+
+  // ==========
+  // COMPONENTS
+  // ==========
+
+
+  function Facet(data) {
+    this.key = data.key;
+    this.layers = data.layers;
+    this.opts = data.opts;
+    this.index = data.index;
+  }
+
+
+  function Layer(data) {
+    this.opts = data.opts;
+    this.groups = data.groups;
+  }
+
+
+  // ===========
+  // CONTROLLERS
+  // ===========
+
+
+  function FacetsController(layersController) {
+    this.scale = { x: d3.scale.ordinal(), y: d3.scale.ordinal(), domain: [] };
+    this.layersController = layersController;
+  }
+
+
+  function LayersController(groupsController) {
+    this.groupsController = groupsController;
+  }
+
+
+  function GroupsController(geometriesController) {
+    this.geometriesController = geometriesController;
+  }
+
+
+  function GeometriesController() {}
 
 
   // ========
-  // GRAPHICS
+  // DEFAULTS
   // ========
 
 
-  function Graphic(data, params) {
-
-    this.data = data || [];
-    this.params = params || {};
-
-    if (this.params.facets && this.params.facets.grid) {
-      this.facets = new GridFacets(this);
-    }
-
-    else if (this.params.facets && this.params.facets.flow) {
-      this.facets = new FlowFacets(this);
-    }
-
-    else {
-      this.facets = new FlowFacets(this);
-    }
-
-  }
-
-
-  Graphic.prototype.onRender = function() {};
-
-
-  // ======
-  // FACETS
-  // ======
-
-
-  function Facets() {}
-
-
-  function FlowFacets(graphic) {
-
-    var that = this;
-
-    this.graphic = graphic;
-    this.data = graphic.data;
-
-    var facet = graphic.params.facets ? graphic.params.facets.flow : undefined;
-
-    this.domain = _.uniq(_.map(this.data, function(row) { return row[facet]; }));
-    this.charts = this.domain.map(function(key) { return new Chart(that, key); });
-
-    this.x = new CategoricalScale(this.data, facet);
-    this.y = new CategoricalScale(this.data, facet);
-
-  }
-
-  FlowFacets.prototype = new Facets();
-
-
-  FlowFacets.prototype.xRange = function() {
-    var that = this;
-    return this.x.domain.map(function(d, i) {
-      if (that.x.domain.length < that.ratio) { return i * (that.width/that.x.domain.length); }
-      var colNum = i % that.ratio;
-      return (colNum/that.numCols) * that.width; 
-    });
+  var facetsDefaultOpts = {
+    flow: undefined,
+    gridX: undefined,
+    gridY: undefined
   };
 
 
-  FlowFacets.prototype.yRange = function() {
-    var that = this;
-    return this.y.domain.map(function(d, i) {
-      var rowNum = Math.floor(i/that.ratio);
-      return (rowNum/that.numRows) * that.height;
-    });
+  var layerDefaultOpts = {
+    geometry: 'point',
+    mapping: {}
   };
 
 
-  function GridFacets(graphic) {
+  var groupDefaultOpts = {
+    group: undefined
+  };
 
+
+  var geometriesDefaults = {};
+
+
+  // =========
+  // CONFIGURE
+  // =========
+
+
+  Graphic.prototype.configure = function(opts) {
+    this.opts = _.defaults(opts || {}, { graphic: {}, facets: {}, layers: [], groups: [] });
+    this.opts.facets = this.facetsController.configure(opts);
+    this.opts.layers = this.layersController.configure(opts);
+    this.opts.groups = this.groupsController.configure(opts);
+    this.opts.geometries = this.geometriesController.configure(opts);
+  };
+
+
+  FacetsController.prototype.configure = function(opts) {
+    this.opts = _.extend({}, facetsDefaultOpts, opts.graphic, opts.facets);
+    return this.opts;
+  };
+
+
+  LayersController.prototype.configure = function(opts) {
+    if (!opts.layers.length > 0) { opts.layers[0] = _.extend({}, layerDefaultOpts, opts.graphic); }
+    this.opts = opts.layers.map(function(layerOpts) { return _.extend({}, layerDefaultOpts, opts.graphic, layerOpts); });
+    return this.opts;
+  };
+
+
+  GroupsController.prototype.configure = function(opts) {
+    if (!opts.groups.length > 0) { opts.groups = opts.layers.map(function(layer) { return _.extend(layer, groupDefaultOpts); }); }
+    this.opts = opts.groups.map(function(groupOpts, index) { 
+      return _.extend({}, groupDefaultOpts, opts.graphic, opts.facets, opts.layers[index], groupOpts); 
+    });
+    return this.opts;
+  };
+
+
+  GeometriesController.prototype.configure = function(opts) {
+    if (!opts.geometries.length > 0) { opts.geometries = opts.groups.map(function(groupOpts) { return _.extend(groupOpts, geometriesDefaults); }); }
+    this.opts = opts.geometries.map(function(geometriesOpts, index) {
+      return _.extend({}, geometriesDefaults, opts.graphic, opts.facets, opts.layers[index], opts.groups[index], geometriesOpts); 
+    });
+    return this.opts;
+  };
+
+
+  // =========
+  // CALCULATE
+  // =========
+
+
+  Graphic.prototype.calculate = function(dataset) {
+    if (!_.isArray(dataset)) { return this.dataset || []; }
+    this.dataset = dataset;
+    this.facetsController.train(dataset);
+    this.layersController.train(dataset);
+    this.groupsController.train(dataset);
+    this.facets = this.facetsController.calculate(dataset);
+  };
+
+
+  FacetsController.prototype.calculate = function(dataset) {
     var that = this;
-
-    this.graphic = graphic;
-    this.data = graphic.data;
-
-    this.x, new CategoricalScale(this.data, this.graphic.params.facets.x);
-    this.y, new CategoricalScale(this.data, this.graphic.params.facets.y);
-
-  }
-
-  GridFacets.prototype = new Facets();
-
-
-  // ======
-  // CHARTS
-  // ======
-
-
-  function Chart(facets, key) {
-
-    var that = this;
-
-    this.facets = facets;
-    this.data = facets.data;
-    this.key = key;
-
-    var layerOpts = facets.graphic.params.layers || [];
-    this.layers = layerOpts.map(function(opts) { return new Layer(that, opts); });
-
-  }
-
-
-  // ======
-  // LAYERS
-  // ======
-
-
-  function Layer(chart, opts) {
-
-    this.chart = chart;
-    this.data = chart.data;
-
-    this.mapping = opts.mapping || {};
-
-    this.x = new LinearScale(this.data, this.mapping.x);
-    this.y = new LinearScale(this.data, this.mapping.y);
-
-    if (opts.geometry === 'point') {
-      this.geometry = new PointGeometry(this);
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('CALCULATE FOR GRID');
     }
-
     else {
-      this.geometry = new PointGeometry(this);
+      var facets = d3.nest()
+        .key(function(row) { return row[that.opts.flow]; })
+        .entries(dataset)
+        .map(function(facet, index) {
+          var facet = { opts: that.opts, values: facet.values, index: index };
+          facet.layers = that.layersController.calculate(facet);
+          return new Facet(facet);
+      });
+      return facets;
     }
+  };
 
-    this.xRange = function() { return [0, this.chart.width]; };
-    this.yRange = function() { return [this.chart.height, 0]; };
 
-  }
+  LayersController.prototype.calculate = function(facet) {
+    var that = this;
+    var layers = this.opts.map(function(layerOpts, index) {
+      var layer = { opts: layerOpts, values: facet.values, index: index };
+      layer.groups = that.groupsController.calculate(layer);
+      return new Layer(layer);
+    });
+    return layers;
+  };
+
+
+  GroupsController.prototype.calculate = function(layer) {
+    var that = this;
+    var groups = d3.nest()
+      .key(function(row) { return row[layer.opts.mapping.group]; })
+      .entries(layer.values)
+      .map(function(group) {
+        group.opts = that.opts[layer.index];
+        return that.geometriesController.calculate(group);
+      });
+    return groups;
+  };
+
+
+  GeometriesController.prototype.calculate = function(group) {
+    return new { point: PointGeometry }[group.opts.geometry](group);
+  };
+
 
 
   // ==========
@@ -166,250 +225,160 @@
 
   function Geometry() {}
 
-  Geometry.prototype.initialize = function() {
 
-    this.color = this.layer.mapping.color;
-    this.colors = new ColorScale(this.data, this.color);
+  function PointGeometry(data) {
+    this.key = data.key;
+    this.opts = data.opts;
+    this.values = data.values;
+  }
 
-    this.group = this.layer.mapping.group;
-    this.groups = d3.nest().key(function(row) { return row[this.group]; }).entries(this.data);
 
+  // =====
+  // TRAIN
+  // =====
+
+
+  FacetsController.prototype.train = function(dataset) {
+    var that = this;
+    this.scale.domain = d3.set(dataset.map(function(row) { return row[that.opts.flow]; })).values();
   };
 
 
-  // =================
-  // GEOMETRIES: POINT
-  // =================
+  LayersController.prototype.train = function(dataset) {};
 
 
-  function PointGeometry(layer) {
-    this.type = 'point';
-    this.layer = layer;
-    this.data = layer.data;
-    this.initialize();
-  }
-
-  PointGeometry.prototype = new Geometry();
+  GroupsController.prototype.train = function(dataset) {};
 
 
-  // ======
-  // SCALES
-  // ======
+  // =========
+  // SET RANGE
+  // =========
 
 
-  function Scale() {}
-
-
-  // ===================
-  // SCALES: CATEGORICAL
-  // ===================
-
-
-  function CategoricalScale(data, key) {
-    this.key = key;
-    this.scale = d3.scale.ordinal();
-    this.domain = _.uniq(_.map(data, function(row) { return row[key]; }));
-    this.scale.domain(this.domain);
-  }
-
-  CategoricalScale.prototype = new Scale();
-
-
-  // ==============
-  // SCALES: LINEAR
-  // ==============
-
-
-  function LinearScale(data, key) {
-    this.key = key;
-    this.scale = d3.scale.linear();
-    this.domain = d3.extent( data.map(function(row) { return row[key]; }) );
-    this.scale.domain(this.domain);
-  }
-
-  LinearScale.prototype = new Scale();
-
-
-  // =============
-  // SCALES: COLOR
-  // =============
-
-
-  function ColorScale(data, key) {
-    this.key = key;
-    this.scale = d3.scale.category20();
-    this.domain = _.uniq(_.map(data, function(row) { return row[key]; }));
-    this.scale.domain(this.domain);
-  }
-
-  ColorScale.prototype = new Scale();
-
-
-  // ==============
-  // RENDER GRAPHIC
-  // ==============
-
-
-  Graphic.prototype.render = function(el, width, height) {
-
-    this.onRender();
-
-    // If width and height are given, draw facets to those dimensions.
-    // Otherwise set to the current dimensions of the element.
-
-    if (width && height) {
-      this.width  = width;
-      this.height = height;
+  FacetsController.prototype.setRangeX = function(width, height, ratio, numFacets, numCols) {
+    var that = this;
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('SET GRID RANGE X');
     }
-
     else {
-      this.width  = el.style('width');
-      this.height = el.style('height');
+      var xRange = this.scale.domain.map(function(key, index) {
+        if (numFacets < ratio) { return index * (width/numFacets); }
+        var colNum = index % ratio;
+        return (colNum/numCols) * that.width; 
+      });
+      this.scale.x.range(xRange);
     }
-
-    this.el = el.append('svg');
-
-    this.el
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .attr('class', 'graphic');
-
-    this.facets.render();
-
   };
 
 
-  // =============
-  // RENDER FACETS
-  // =============
-
-
-  Facets.prototype.onRender = function() {
-
-    this.width = parseInt(this.graphic.width);
-    this.height = parseInt(this.graphic.height);
-
-    this.ratio = this.width/this.height >= 1 ? Math.floor(this.width/this.height) : 1/Math.floor(this.height/this.width);
-
-    this.numRows = this.ratio >= 1 ? Math.ceil(this.y.domain.length/this.ratio) : Math.ceil(this.ratio/this.y.domain.length);
-    this.numCols = Math.ceil(this.x.domain.length/this.numRows);
-
-    this.x.scale.range(this.xRange());
-    this.y.scale.range(this.yRange());
-
+  FacetsController.prototype.setRangeY = function(width, height, ratio, numFacets, numRows) {
+    if (this.opts.gridX || this.opts.gridY) {
+      console.log('SET GRID RANGE Y');
+    }
+    else {
+      var yRange = this.scale.domain.map(function(key, index) {
+        var rowNum = Math.floor(index/ratio);
+        return (rowNum/numRows) * height;
+      });
+      this.scale.y.range(yRange);
+    }
   };
 
 
-  Facets.prototype.render = function() {
+  // ====
+  // DRAW
+  // ====
+
+
+  Graphic.prototype.draw = function(el, width, height) {
+    if (!_.isString(el)) { return this.el; }
+    this.target = d3.select(el);
+    this.width  = width  || parseInt(this.target.style('width'));
+    this.height = height || parseInt(this.target.style('height'));
+    this.el = d3.select(document.createElement('div'));
+    this.el.append('svg').attr('width', this.width).attr('height', this.height).attr('class', 'graphic');
+    this.facetsController.draw(this.facets, this.el, this.width, this.height);
+  };
+
+
+  FacetsController.prototype.draw = function(facets, el, width, height) {
 
     var that = this;
-    this.onRender();
 
-    this.el = this.graphic.el.selectAll('g.facet');
-    this.el
-      .data(this.charts)
+    var numFacets = facets.length;
+    var ratio     = width/height >= 1 ? Math.floor(width/height) : 1/Math.floor(height/width);
+    var numRows   = ratio >= 1 ? Math.ceil(numFacets/ratio) : Math.ceil(ratio/numFacets);
+    var numCols   = Math.ceil(numFacets/numRows);
+
+    this.width  = width/numCols;
+    this.height = height/numRows;
+    this.setRangeX(width, height, ratio, numFacets, numCols);
+    this.setRangeY(width, height, ratio, numFacets, numRows);
+
+    this.el = el.select('svg');
+    this.el.selectAll('g.facet')
+      .data(facets)
       .enter()
       .append('g')
       .attr('class', 'facet')
-      .attr('data-key', function(chart) { return chart.key; })
-      .attr('transform', function(chart) { 
-        return 'translate(' + that.x.scale(chart.key) + ',' + that.y.scale(chart.key) + ')'; 
+      .attr('data-key', function(facet) { return facet.key; })
+      .attr('transform', function(facet) {
+        return 'translate(' + that.scale.x(facet.key) + ',' + that.scale.y(facet.key) + ')';
       })
-      .each(function(chart, index) {
-        chart.render(this, index);
+      .each(function(facet, index) {
+        that.layersController.draw(facet, this);
       });
 
   };
 
 
-  // =============
-  // RENDER CHARTS
-  // =============
-
-
-  Chart.prototype.onRender = function() {
-    this.width = this.facets.width / this.facets.numCols;
-    this.height = this.facets.height / this.facets.numRows;
-  };
-
-
-  Chart.prototype.render = function(el, index) {
-
+  LayersController.prototype.draw = function(facet, el) {
     var that = this;
-    this.onRender();
-
     this.el = d3.select(el);
-    this.el.selectAll('g.layers')
-      .data(this.layers)
+    this.el.selectAll('g.layer')
+      .data(facet.layers)
       .enter()
       .append('g')
-      .attr('class', 'layers')
-      .each(function(layer, index) { 
-        layer.render(this, index); 
+      .attr('class', 'layer')
+      .attr('data-geometry', function(layer) { return layer.geometry; })
+      .each(function(layer) {
+        that.groupsController.draw(layer, this);
       });
-
   };
 
 
-  // =============
-  // RENDER LAYERS
-  // =============
-
-
-  Layer.prototype.onRender = function() {
-    this.x.scale.range(this.xRange());
-    this.y.scale.range(this.yRange());
-  };
-
-
-  Layer.prototype.render = function(el, index) {
-
-    this.onRender();
-
+  GroupsController.prototype.draw = function(layer, el) {
     var that = this;
-
-    this.el = d3.select(el).append('g').attr('class', 'layer');
-    this.el
-      .attr('data-geometry', function(d){ return d.geometry.type; });
-
-    this.geometry.render(this.el);
-
-  };
-
-
-  // =====================
-  // RENDER POINT GEOMETRY
-  // =====================
-
-
-  PointGeometry.prototype.render = function(el) {
-
-    var that = this;
-    this.el = el;
-
-    var groups = this.el.selectAll('g.group')
-      .data(this.groups)
+    this.el = d3.select(el);
+    this.el.selectAll('g.group')
+      .data(layer.groups)
       .enter()
       .append('g')
       .attr('class', 'group')
-      .attr('data-group', function(group){ return group.key; });
-
-    groups.selectAll('circle')
-      .data(function(group) { return group.values; })
-      .enter()
-      .append('circle')
-      .attr('cx', function(row) { return that.layer.x.scale(row[that.layer.x.key]); })
-      .attr('cy', function(row) { return that.layer.y.scale(row[that.layer.y.key]); })
-      .attr('r', 3)
-      .attr('fill', function(row) { return that.colors.scale(row[that.color.key]); })
-      .attr('stroke', 'none');
-
+      .attr('data-group', function(geometry) { return geometry.key; })
+      .each(function(geometry) {
+        that.geometriesController.draw(geometry, this);
+      });
   };
 
 
-  // ===
-  // API
-  // ===
+  GeometriesController.prototype.draw = function(geometry, el) {
+  };
+
+
+  // ======
+  // RENDER
+  // ======
+
+
+  Graphic.prototype.render = function() { 
+    this.target.html(this.el.html()); 
+  };
+
+
+  // =============
+  // EXPORT GLOBAL
+  // =============
 
 
   // Export as Node module.
@@ -419,7 +388,6 @@
 
   // Export to global context.
   this.Graphic = Graphic;
-
 
 
 })();
