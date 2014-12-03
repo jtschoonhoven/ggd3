@@ -32,48 +32,70 @@
   // all methods used to create a new Graphic and will
   // be exported to the global object.
 
-  var ggd3 = {
-    factories: {},
-    components: {}
+  var ggd3 = {};
+  ggd3.VERSION = 0.0.0
+
+  // "Create" returns a new instance of Graphic and
+  // optionally configures and renders it to the DOM.
+  // None of the arguments are required. 
+
+  ggd3.create = function(opts, data, selector, width, height, renderNow) {
+    var graphic = new Graphic();
+    if (opts)   { graphic.configure(opts); }
+    if (data)   { graphic.data(data); }
+    if (el)     { graphic.draw(el, height, width); }
+    if (render) { graphic.render(); }
+    return graphic;
   };
 
-  // "Create" is a one-step method to create a new
-  // graphic. Internally it simply calls all (or some) of 
-  // the other top level methods in order.
-
-  var create = ggd3.create = function(opts) {
-    if (opts.opts)   { this.configure(opts); }
-    if (opts.data)   { this.data(data); }
-    if (opts.el)     { this.draw(el, height, width); }
-    if (opts.render) { this.render(); }
-  };
-
-  // Configure
+  // The Graphic constructor
   // ----------------------------------------------------
-  // "Configure" is a top level method that configures
-  // the component factories.
+  // A new Graphic contains all the methods that 
+  // configure and render an SVG. That process is
+  // represented by four functions. In order,
+  // **configure**, **data**, **draw**, and **render**.
 
-  var configure = ggd3.configure = function(opts) {
-    var defaults = { flow: undefined, gridX: undefined, gridY: undefined };
-    this.factories.facet = new FacetFactory()
+  var Graphic = function() {}
+
+  // Step #1: Configure
+  // ----------------------------------------------------
+  // Our end goal is to represent a dataset with various
+  // components (facets, layers, geometries) and to
+  // render those to the DOM. The first step is to
+  // configure factory functions for those components so
+  // that, when data is applied to the factory function,
+  // a properly configured component is returned.
+
+  Graphic.prototype.configure = function(opts) {};
+
+  // Step #2: Apply data
+  // ----------------------------------------------------
+  // Now that component factories have been created and
+  // configured, the next step is to apply that data to
+  // the factories and manufacture some components.
+
+  Graphic.prototype.data = function(data) {};
+
+  // Step #3: Draw SVG
+  // ----------------------------------------------------
+  // Now that components have been created, representing
+  // them as an SVG is trivial. Note that the SVG is not
+  // attached to the DOM. That is accomplished in step 4.
+
+  Graphic.prototype.draw = function(selector, height, width) {};
+
+  // Step #4: Render SVG
+  // ----------------------------------------------------
+  // The SVG has been drawn, all that is left is to
+  // attach it to the DOM.
+
+  Graphic.prototype.render = function(selector) {
+    this.target.html(this.el.html());
   };
 
-  // Set up a Factory class that the component factories
-  // will inherit from.
+  // Return SVG HTML or undefined.
 
-  var Factory = function() {}
-
-  _.extend(Factory.prototype, {
-    initialize: function() {}
-  })
-
-
-  var FacetFactory = function(spec) {
-    spec || spec = {};
-    this.initialize.apply(this, arguments);
-  };
-
-
+  Graphic.prototype.html = function() {};
 
   // "Extend" should look familiar if you've used 
   // Backbone. Returns a new object that inherits from
