@@ -33,8 +33,8 @@
   // be exported to the global object.
 
   var ggd3 = {
-    configure: function(opts) {},
-    data: function(data) {}
+    factories: {},
+    components: {}
   };
 
   // "Create" is a one-step method to create a new
@@ -51,34 +51,50 @@
   // Configure
   // ----------------------------------------------------
   // "Configure" is a top level method that configures
-  // the component controllers. Controllers are
-  // primarily factories for components, though they
-  // contain other properties as well.
+  // the component factories.
 
   var configure = ggd3.configure = function(opts) {
-
+    var defaults = { flow: undefined, gridX: undefined, gridY: undefined };
+    this.factories.facet = new FacetFactory()
   };
 
+  // Set up a Factory class that the component factories
+  // will inherit from.
 
-  var Controller = ggd3.Controller = function(spec) {
+  var Factory = function() {}
+
+  _.extend(Factory.prototype, {
+    initialize: function() {}
+  })
+
+
+  var FacetFactory = function(spec) {
     spec || spec = {};
     this.initialize.apply(this, arguments);
   };
 
 
-  _.extend(Controller.prototype, {
-    initialize: function() {}
-  });
+
+  // "Extend" should look familiar if you've used 
+  // Backbone. Returns a new object that inherits from
+  // its parent and defined properties.
+
+  var extend = function(protoProperties, instanceProperties) {
+    var parent = this;
+    var child = parent.apply(this, arguments);
+    _.extend(child, parent, instanceProperties);
+    child.prototype = parent.prototype;
+    return child;
+  };
+
+  Factory.extend = extend;
 
   // Export global
   // ----------------------------------------------------
   // Export as a Node module if applicable. Either way,
   // attach ggd3 to the global object.
 
-  if (isNode) {
-    module.exports = ggd3;
-  }
-
+  if (isNode) { module.exports = ggd3; }
   this.ggd3 = ggd3;
 
 })();
