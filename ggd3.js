@@ -96,8 +96,27 @@
     scaleX: 'categorical',
     scaleY: 'linear',
     coordinates: 'cartesian',
-    facets: {},
-    layers: []
+  };
+
+
+
+  // "defaultOpts" is used to set the default values
+  // in the opts object. More importantly, it also
+  // holds the logic that cascades options down the
+  // component hierarchy, graphic >> facets >> layers.
+
+  var defaultOpts = function(opts) {
+    var opts = opts || {};
+
+    _.defaults(opts, optionsDefaults, { graphic: {}, facets: {}, layers: [{}] })
+    _.defaults(opts.graphic, opts);
+    _.defaults(opts.facets, opts.graphic);
+
+    opts.layers.map(function(layer) {
+      return _.defaults(layer, opts.facets);
+    });
+
+    return opts;
   };
 
 
@@ -115,10 +134,16 @@
   // "ComponentFactory" is a generic factory that will be
   // used to extend new component factories.
 
-  var ComponentFactory = function() {
+  var ComponentFactory = function(opts, ChildFactory) {
     var that = this;
+
+    if (ChildFactory) {
+      this.childFactory = new ChildFactory(opts);
+    }
+
     this.Constructor = function(properties) { _.extend(this, properties); };
     this.create = function(properties) { return new that.Constructor(properties); };
+    this.extend = function(model) { _.extend(that, model); };
   };
 
 
@@ -129,51 +154,32 @@
   // Otherwise extend from FlowFacets.
 
   var FacetFactory = function(opts) {
-    this.opts = _.extend(opts, opts.facets);
-    ComponentFactory.apply(this);
-
-    this.layerFactory = new LayerFactory(opts);
-
-    if (opts.gridX || opts.gridY) { _.extend(this, gridFacets); }
-    else { _.extend(this, flowFacets); }
+    ComponentFactory.apply(this, [opts, LayerFactory]);
+    if (opts.facets.gridX || opts.facets.gridY) { this.extend(gridFacets); }
+    else { this.extend(flowFacets); }
   };
 
 
 
   var LayerFactory = function(opts) {
-    opts.layers[0] = opts.layers[0] || {};
-
-    this.opts = opts.layers.map(function(layerOpts, index) {
-      opts.layers[index] = _.extend({}, opts, opts.facets, layerOpts);
-      return opts.layers[index];
-    });
-
-    ComponentFactory.apply(this);
-    this.geometryFactory = new GeometryFactory(opts);
-
-    _.extend(this, layers);
+    ComponentFactory.apply(this, [opts, GeometryFactory]);
+    this.extend(layers);
   };
 
 
 
   var GeometryFactory = function(opts) {
-    this.opts = opts.layers.map(function(layerOpts, index) {
-      return _.extend(opts, opts.facets, layerOpts);
-    });
-
-    ComponentFactory.apply(this);
-
-    _.extend(this, geometry);
-    if (opts.geometry === 'line') { _.extend(this, lineGeometry); }
-    else { _.extend(this, pointGeometry); }
+    ComponentFactory.apply(this, opts);
+    this.extend(geometry);
+    if (opts.geometry === 'line') { this.extend(lineGeometry); }
+    else { this.extend(pointGeometry); }
   };
 
 
 
   Graphic.prototype.configure = function(opts) {
-    this.opts = _.defaults(opts || {}, optionsDefaults);
-    this.facetFactory = new FacetFactory(opts);
-    this.opts = opts;
+    this.opts = defaultOpts(opts);
+    this.facetFactory = new FacetFactory(this.opts);
   };
 
 
@@ -203,7 +209,7 @@
       .entries(dataset);
 
     facets = facets.map(function(facet, index) {
-      var layers = that.layerFactory.data(facet.values);
+      var layers = that.childFactory.data(facet.values);
       return that.create({ key: facet.key, layers: layers });
     });
 
@@ -216,7 +222,7 @@
     var that = this;
 
     var layers = this.opts.map(function(layerOpts, index) {
-      var groups = that.geometryFactory.data(facetValues, layerOpts);
+      var groups = that.childFactory.data(facetValues, layerOpts);
       return that.create({ layerIndex: index, geometry: layerOpts.geometry, groups: groups });
     });
 
@@ -267,8 +273,8 @@
 
 
 
-  flowFacet.draw = function() {
-    
+  flowFacets.draw = function() {
+
   };
 
 
