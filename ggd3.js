@@ -48,10 +48,13 @@
 
   ggd3.create = function(opts, data, selector, width, height, renderNow) {
     var graphic = new Graphic();
-    if (opts)   { graphic.configure(opts); }
-    if (data)   { graphic.data(data); }
-    if (el)     { graphic.draw(el, height, width); }
-    if (render) { graphic.render(); }
+
+    graphic.configure(opts);
+
+    if (data) { graphic.data(data); }
+    if (selector || (height && width)) { graphic.draw(selector, height, width); }
+    if (renderNow) { graphic.render(); }
+
     return graphic;
   };
 
@@ -100,10 +103,12 @@
 
 
   // Components.
-
-  var gridFacet = {};
-  var flowFacet = {};
-  var layer = {};
+  var gridFacets = {};
+  var flowFacets = {};
+  var layers = {};
+  var geometry = {};
+  var pointGeometry = {};
+  var lineGeometry = {};
 
 
 
@@ -120,36 +125,47 @@
   // "FacetFactory" extends ComponentFactory and then
   // creates an array of LayerFactories for each layer
   // in opts (at least one). If the user has specified
-  // grid faceting then extend from GridFacet.
-  // Otherwise extend from FlowFacet.
+  // grid faceting then extend from GridFacets.
+  // Otherwise extend from FlowFacets.
 
   var FacetFactory = function(opts) {
     this.opts = _.extend(opts, opts.facets);
     ComponentFactory.apply(this);
 
+    this.layerFactory = new LayerFactory(opts);
+
+    if (opts.gridX || opts.gridY) { _.extend(this, gridFacets); }
+    else { _.extend(this, flowFacets); }
+  };
+
+
+
+  var LayerFactory = function(opts) {
     opts.layers[0] = opts.layers[0] || {};
-    this.layerFactories = opts.layers.map(function(layer, index) {
-      return new LayerFactory(opts, index);
+
+    this.opts = opts.layers.map(function(layerOpts, index) {
+      opts.layers[index] = _.extend({}, opts, opts.facets, layerOpts);
+      return opts.layers[index];
     });
 
-    if (opts.gridX || opts.gridY) { this.data = gridFacet.data; }
-    else { this.data = flowFacet.data; }
+    ComponentFactory.apply(this);
+    this.geometryFactory = new GeometryFactory(opts);
+
+    _.extend(this, layers);
   };
 
 
 
-  var LayerFactory = function(opts, index) {
-    this.opts = _.extend(opts, opts.facets[index]);
+  var GeometryFactory = function(opts) {
+    this.opts = opts.layers.map(function(layerOpts, index) {
+      return _.extend(opts, opts.facets, layerOpts);
+    });
+
     ComponentFactory.apply(this);
-    _.extend(this.Constructor.prototype, new Layer());
-    this.geometryFactory = new GeometryFactory(opts, index);
-  };
 
-
-
-  var GeometryFactory = function(opts, index) {
-    this.opts = _.extend(opts, opts.facets[index]);
-    ComponentFactory.apply(this);
+    _.extend(this, geometry);
+    if (opts.geometry === 'line') { _.extend(this, lineGeometry); }
+    else { _.extend(this, pointGeometry); }
   };
 
 
@@ -157,6 +173,7 @@
   Graphic.prototype.configure = function(opts) {
     this.opts = _.defaults(opts || {}, optionsDefaults);
     this.facetFactory = new FacetFactory(opts);
+    this.opts = opts;
   };
 
 
@@ -165,16 +182,61 @@
   // ----------------------------------------------------
   // Now that component factories have been created and
   // configured, the next step is to apply that data to
-  // the factories and manufacture some components.
+  // the factories and manufacture the components.
 
   Graphic.prototype.data = function(dataset) {
-    this.facets = this.FacetFactory.data(dataset);
+    this.facets = this.facetFactory.data(dataset);
+    console.log(JSON.stringify(this.facets, null, 1));
   };
+
+
+
+  gridFacets.data = function(dataset) {};
 
 
 
   flowFacets.data = function(dataset) {
     var that = this;
+
+    var facets = d3.nest()
+      .key(function(row) { return row[that.opts.flow]; })
+      .entries(dataset);
+
+    facets = facets.map(function(facet, index) {
+      var layers = that.layerFactory.data(facet.values);
+      return that.create({ key: facet.key, layers: layers });
+    });
+
+    return facets;
+  };
+
+
+
+  layers.data = function(facetValues) {
+    var that = this;
+
+    var layers = this.opts.map(function(layerOpts, index) {
+      var groups = that.geometryFactory.data(facetValues, layerOpts);
+      return that.create({ layerIndex: index, geometry: layerOpts.geometry, groups: groups });
+    });
+
+    return layers;
+  }
+
+
+
+  geometry.data = function(facetValues, layerOpts) {
+    var that = this;
+
+    var geometries = d3.nest()
+      .key(function(row) { return row[layerOpts.group]; })
+      .entries(facetValues);
+
+    geometries = geometries.map(function(geom, index) {
+      return that.create({ key: geom.key, values: geom.values });
+    });
+
+    return geometries;
   };
 
 
@@ -185,7 +247,29 @@
   // them as an SVG is trivial. Note that the SVG is not
   // attached to the DOM. That is accomplished in step 4.
 
-  Graphic.prototype.draw = function(selector, height, width) {};
+  Graphic.prototype.draw = function(selector, width, height) {
+    var that = this;
+
+    if (!selector && (!width || !height)) {
+      throw { message: '"Draw" called without dimensions or selector.' }
+    }
+
+    this.el = d3.select(document.createElement('div'));
+    this.target = selector ? d3.select(selector) : undefined;
+
+    this.width  = width  || parseInt(this.target.style('width'));
+    this.height = height || parseInt(this.target.style('height'));
+
+    this.facets.forEach(function(facet) {
+      facet.draw();
+    });
+  };
+
+
+
+  flowFacet.draw = function() {
+    
+  };
 
 
 
@@ -217,3 +301,5 @@
 
 
 })();
+
+ggd3.create({ geometry: 'line', group: 'name', layers: [{}, {}]}, [{ name: 'ok', value: 1 }], null, 200, 200);
