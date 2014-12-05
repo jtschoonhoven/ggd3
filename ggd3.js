@@ -95,7 +95,8 @@
     geometry: 'point',
     scaleX: 'categorical',
     scaleY: 'linear',
-    coordinates: 'cartesian'
+    coordinates: 'cartesian',
+    filter: []
   };
 
 
