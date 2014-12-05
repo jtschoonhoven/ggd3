@@ -42,17 +42,35 @@ function addDiv() {
 var expect = chai.expect;
 
 describe('Configure', function() {
-
   it('opts defined in an upper level component cascade to lower level components', function() {
-    var opts = { 
-      graphic: { gridX: 'A', mapping: 'B' }, 
-      facets: { gridY: 'C', group: 'D' }, 
-      layers: [{ geometry: 'E' }, { geometry: 'F', mapping: 'G' }]
+    var inputOpts = { 
+      x: 'X',
+      y: 'Y',
+      graphic: { gridX: 'A' }, 
+      facets: { gridY: 'C', group: 'D', color: 'E' }, 
+      layers: [{ geometry: 'F', color: 'G' }, { geometry: 'H', color: 'I' }]
     };
-    var graphic = new Graphic(opts);
-    // console.log(opts);
-  });
 
+    var graphic = ggd3.create(inputOpts);
+
+    // Calling graphic.configure() returns the parsed options.
+    var outputOpts = graphic.configure();
+
+    expect(outputOpts).to.have.keys(['graphic', 'facets', 'layers']);
+
+    // The "X" property defined outside of a component class
+    // cascades to all components.
+    expect(outputOpts.graphic).to.have.deep.property('x', 'X');
+    expect(outputOpts.facets).to.have.deep.property('x', 'X');
+    expect(outputOpts.layers[0]).to.have.deep.property('x', 'X');
+
+    // The "color" property exists on the graphic, but it is
+    // undefined. It exists as specified on facets and layers.
+    expect(outputOpts.graphic).to.contain.keys('color');
+    expect(outputOpts.facets.graphic).to.be.undefined;
+    expect(outputOpts.facets).to.have.deep.property('color', 'E');
+    expect(outputOpts.layers[0]).to.have.deep.property('color', 'G');    
+  });
 });
 
 describe('Facets', function() {
@@ -61,9 +79,9 @@ describe('Facets', function() {
     var el = addDiv();
     var opts = {
       facets: { flow: 'country' }, 
-      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country' } }]
+      layers: [{ geometry: 'point', x: 'day', y: 'units', color: 'country' }]
     };
-    var graphic = new Graphic(opts, data.threeDimensional, el, null, null, true);
+    var graphic = ggd3.create(opts, data.threeDimensional, el, null, null, true);
     expect(d3.select(el).selectAll('svg .facet').size()).to.equal(2);
   });
 
@@ -72,9 +90,9 @@ describe('Facets', function() {
     var el = addDiv();
     var opts = {
       facets: {},
-      layers: [{ geometry: 'point', mapping: { x: 'day', y: 'units', color: 'country', group: 'country' } }] 
+      layers: [{ geometry: 'point', x: 'day', y: 'units', color: 'country', group: 'country' }] 
     };
-    var graphic = new Graphic(opts, data.threeDimensional, el, null, null, true);
+    var graphic = ggd3.create(opts, data.threeDimensional, el, null, null, true);
     expect(d3.select(el).selectAll('svg .facet').size()).to.equal(1);
   });
 

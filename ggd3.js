@@ -107,16 +107,18 @@
 
   var defaultOpts = function(opts) {
     var opts = opts || {};
+    var components = ['graphic', 'facets', 'layers'];
 
-    _.defaults(opts, optionsDefaults, { graphic: {}, facets: {}, layers: [{}] })
-    _.defaults(opts.graphic, opts);
+    _.defaults(opts, { graphic: {}, facets: {}, layers: [{}] });
+    _.defaults(opts.graphic, optionsDefaults, _.omit(opts, components));
     _.defaults(opts.facets, opts.graphic);
 
-    opts.layers.map(function(layer) {
-      return _.defaults(layer, opts.facets);
+    opts.layers.map(function(layerOpts) {
+      return _.defaults(layerOpts, opts.facets);
     });
 
-    return opts;
+    // Only return opts.graphic, .facets & .layers.
+    return _.pick(opts, components);
   };
 
 
@@ -125,6 +127,7 @@
   var gridFacets = {};
   var flowFacets = {};
   var layers = {};
+  var groups = {};
   var geometry = {};
   var lineGeometry = {};
   var barGeometry = {};
@@ -171,13 +174,14 @@
   // defined in opts ("point" by default).
 
   var GeometryFactory = function(opts) {
+    var that = this;
     ComponentFactory.apply(this, opts);
 
     this.extend(geometry);
-    this.geometries = opts.layers.map(function(layer) {
-      if (opts.geometry === 'line') { return lineGeometry; }
-      if (opts.geometry === 'bar') { return barGeometry; }
-      else { this.extend(pointGeometry); }
+    this.geometries = opts.layers.map(function(layerOpts) {
+      if (layerOpts.geometry === 'line') { return lineGeometry; }
+      if (layerOpts.geometry === 'bar') { return barGeometry; }
+      else { return pointGeometry; }
     });
   };
 
@@ -185,9 +189,11 @@
   // Configure and create the factory instances.
   // The defaultOpts function applies default values to
   // the opts object and cascades properties down the
-  // graphic hierarchy.
+  // graphic hierarchy. If called without argument,
+  // return current opts.
 
   Graphic.prototype.configure = function(opts) {
+    if (!opts) { return this.opts; }
     this.opts = defaultOpts(opts);
     this.geometryFactory = new GeometryFactory(this.opts);
     this.layerFactory = new LayerFactory(this.opts, this.geometryFactory);
@@ -267,10 +273,6 @@
   Graphic.prototype.draw = function(selector, width, height) {
     var that = this;
 
-    if (!selector && (!width || !height)) {
-      throw { message: '"Draw" called without dimensions or selector.' }
-    }
-
     this.el = d3.select(document.createElement('div'));
     this.target = selector ? d3.select(selector) : undefined;
 
@@ -278,7 +280,6 @@
     this.height = height || parseInt(this.target.style('height'));
 
     this.facetFactory.draw.apply(this, this.facets);
-    console.log(this.el.html());
   };
 
 
@@ -286,6 +287,8 @@
   flowFacets.draw = function(facets) {
     var that = this;
     this.el.append('svg')
+      .attr('width', this.width)
+      .attr('height', this.height)
       .selectAll('g.facet')
       .data(this.facets)
       .enter()
@@ -314,18 +317,13 @@
       })
       .each(function(layer, index) {
         var geometry = that.geometryFactory.geometries[index];
-        geometry.draw.apply(that, [layer.groups, this]);
+        groups.draw.apply(that, [layer.groups, this, geometry]);
       });
   };
 
 
-  // Generic geometry draw function.
 
-  geometry.draw = function(selection) {};
-
-
-
-  pointGeometry.draw = function(groups, el) {
+  groups.draw = function(groups, el, geometry) {
     var that = this;
     d3.select(el)
       .selectAll('g.group')
@@ -335,22 +333,31 @@
       .attr('class', 'group')
       .attr('data-key', function(group) {
         return group.key;
+      })
+      .each(function(group) {
+        geometry.draw.apply(that, [group, this, geometry]);
+      });
+  };
+
+
+
+  pointGeometry.draw = function(group, el, geometry) {
+    var that = this;
+    console.log(geometry)
+    d3.select(el).selectAll('circle.point')
+      .data(group.values)
+      .enter()
+      .append('circle')
+      .attr('class', 'point')
+      .attr('cx', function(d) {
+        // return that.geometryFactory
       });
   };
 
 
 
   lineGeometry.draw = function(groups, el) {
-    var that = this;
-    d3.select(el)
-      .selectAll('g.group')
-      .data(groups)
-      .enter()
-      .append('g')
-      .attr('class', 'group')
-      .attr('data-key', function(group) {
-        return group.key;
-      });
+    console.log('TODO');
   };
 
 
@@ -368,7 +375,9 @@
 
   // Return SVG HTML or undefined.
 
-  Graphic.prototype.html = function() {};
+  Graphic.prototype.html = function() {
+    return this.el ? this.el.html() : undefined; 
+  };
 
 
 
