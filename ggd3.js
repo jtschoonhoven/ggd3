@@ -95,7 +95,7 @@
     geometry: 'point',
     scaleX: 'categorical',
     scaleY: 'linear',
-    coordinates: 'cartesian',
+    coordinates: 'cartesian'
   };
 
 
@@ -126,21 +126,20 @@
   var flowFacets = {};
   var layers = {};
   var geometry = {};
-  var pointGeometry = {};
   var lineGeometry = {};
+  var barGeometry = {};
+  var pointGeometry = {};
 
 
 
   // "ComponentFactory" is a generic factory that will be
   // used to extend new component factories.
 
-  var ComponentFactory = function(opts, ChildFactory) {
+  var ComponentFactory = function(opts, childFactory) {
     var that = this;
+    this.opts = opts;
 
-    if (ChildFactory) {
-      this.childFactory = new ChildFactory(opts);
-    }
-
+    this.childFactory = childFactory;
     this.Constructor = function(properties) { _.extend(this, properties); };
     this.create = function(properties) { return new that.Constructor(properties); };
     this.extend = function(model) { _.extend(that, model); };
@@ -153,33 +152,46 @@
   // grid faceting then extend from GridFacets.
   // Otherwise extend from FlowFacets.
 
-  var FacetFactory = function(opts) {
-    ComponentFactory.apply(this, [opts, LayerFactory]);
+  var FacetFactory = function(opts, layerFactory) {
+    ComponentFactory.apply(this, [opts, layerFactory]);
     if (opts.facets.gridX || opts.facets.gridY) { this.extend(gridFacets); }
     else { this.extend(flowFacets); }
   };
 
 
 
-  var LayerFactory = function(opts) {
-    ComponentFactory.apply(this, [opts, GeometryFactory]);
+  var LayerFactory = function(opts, geometryFactory) {
+    ComponentFactory.apply(this, [opts, geometryFactory]);
     this.extend(layers);
   };
 
 
+  // "GeometryFactory" is extended by the generic
+  // geometry component as well as the specific geometry
+  // defined in opts ("point" by default).
 
   var GeometryFactory = function(opts) {
     ComponentFactory.apply(this, opts);
+
     this.extend(geometry);
-    if (opts.geometry === 'line') { this.extend(lineGeometry); }
-    else { this.extend(pointGeometry); }
+    this.geometries = opts.layers.map(function(layer) {
+      if (opts.geometry === 'line') { return lineGeometry; }
+      if (opts.geometry === 'bar') { return barGeometry; }
+      else { this.extend(pointGeometry); }
+    });
   };
 
 
+  // Configure and create the factory instances.
+  // The defaultOpts function applies default values to
+  // the opts object and cascades properties down the
+  // graphic hierarchy.
 
   Graphic.prototype.configure = function(opts) {
     this.opts = defaultOpts(opts);
-    this.facetFactory = new FacetFactory(this.opts);
+    this.geometryFactory = new GeometryFactory(this.opts);
+    this.layerFactory = new LayerFactory(this.opts, this.geometryFactory);
+    this.facetFactory = new FacetFactory(this.opts, this.layerFactory);
   };
 
 
@@ -192,7 +204,6 @@
 
   Graphic.prototype.data = function(dataset) {
     this.facets = this.facetFactory.data(dataset);
-    console.log(JSON.stringify(this.facets, null, 1));
   };
 
 
@@ -205,7 +216,7 @@
     var that = this;
 
     var facets = d3.nest()
-      .key(function(row) { return row[that.opts.flow]; })
+      .key(function(row) { return row[that.opts.facets.flow]; })
       .entries(dataset);
 
     facets = facets.map(function(facet, index) {
@@ -221,7 +232,7 @@
   layers.data = function(facetValues) {
     var that = this;
 
-    var layers = this.opts.map(function(layerOpts, index) {
+    var layers = this.opts.layers.map(function(layerOpts, index) {
       var groups = that.childFactory.data(facetValues, layerOpts);
       return that.create({ layerIndex: index, geometry: layerOpts.geometry, groups: groups });
     });
@@ -266,15 +277,80 @@
     this.width  = width  || parseInt(this.target.style('width'));
     this.height = height || parseInt(this.target.style('height'));
 
-    this.facets.forEach(function(facet) {
-      facet.draw();
-    });
+    this.facetFactory.draw.apply(this, this.facets);
+    console.log(this.el.html());
   };
 
 
 
-  flowFacets.draw = function() {
+  flowFacets.draw = function(facets) {
+    var that = this;
+    this.el.append('svg')
+      .selectAll('g.facet')
+      .data(this.facets)
+      .enter()
+      .append('g')
+      .attr('class', 'facet')
+      .attr('data-key', function(facet) { 
+        return facet.key; 
+      })
+      .each(function(facet) {
+        that.layerFactory.draw.apply(that, [facet.layers, this]);
+      });
+  };
 
+
+
+  layers.draw = function(layers, el) {
+    var that = this;
+    d3.select(el)
+      .selectAll('g.layer')
+      .data(layers)
+      .enter()
+      .append('g')
+      .attr('class', 'layer')
+      .attr('data-geometry', function(layer) { 
+        return layer.geometry; 
+      })
+      .each(function(layer, index) {
+        var geometry = that.geometryFactory.geometries[index];
+        geometry.draw.apply(that, [layer.groups, this]);
+      });
+  };
+
+
+  // Generic geometry draw function.
+
+  geometry.draw = function(selection) {};
+
+
+
+  pointGeometry.draw = function(groups, el) {
+    var that = this;
+    d3.select(el)
+      .selectAll('g.group')
+      .data(groups)
+      .enter()
+      .append('g')
+      .attr('class', 'group')
+      .attr('data-key', function(group) {
+        return group.key;
+      });
+  };
+
+
+
+  lineGeometry.draw = function(groups, el) {
+    var that = this;
+    d3.select(el)
+      .selectAll('g.group')
+      .data(groups)
+      .enter()
+      .append('g')
+      .attr('class', 'group')
+      .attr('data-key', function(group) {
+        return group.key;
+      });
   };
 
 
@@ -308,4 +384,4 @@
 
 })();
 
-ggd3.create({ geometry: 'line', group: 'name', layers: [{}, {}]}, [{ name: 'ok', value: 1 }], null, 200, 200);
+ggd3.create({ flow: 'name', geometry: 'line', group: 'name', layers: [{ geometry: 'point' }, {}]}, [{ name: 'ok', value: 1 }, { name: 'nok', value: 2}], null, 200, 200);
