@@ -27,13 +27,13 @@ gulp.task('bower-build', function() {
 
 // Watch ggd3 for changes and run tests on save.
 gulp.task('watch', ['test'], function() {
-  return gulp.watch(['ggd3.js', 'test.js'], ['test']);
+  return gulp.watch(['ggd3.js', 'test/test.js'], ['test']);
 });
 
 
 // Run test and lint.
 gulp.task('test', ['lint'], function() {
-  gulp.src('./test.js', { read: false })
+  gulp.src('./test/test.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }))
     .on('error', function(err) { return gutil.log(err.stack || err.message); });
 });
