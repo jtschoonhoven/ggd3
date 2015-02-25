@@ -103,7 +103,7 @@ describe('applyData', function() {
       var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
       var graphic = ggd3.create(spec, data);
       graphic.mapData();
-      console.log(graphic.facets);
+      // console.log(graphic.facets);
     });
 
   });

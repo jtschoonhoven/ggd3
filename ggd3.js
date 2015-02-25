@@ -131,32 +131,25 @@
   Graphic.prototype.mapData = function() {
     var that = this;
 
-    var mappings = ['facetY', 'facetX', 'facet', 'color', 'size', 'x', 'y'];
+    var mappings = ['facetY', 'facetX', 'facet', 'color', 'size'];
 
-    function nest(mapping, data, index) {
+    // Use d3.nest() to perform a GroupBy of the dataset.
+    // The result is a list of keys
+    function nest(mapIndex, data, parentIndex) {
+      var mapping = mappings[mapIndex];
       that[mapping] = [];
+
       d3.nest()
-        .key(function(d) { return d[mapping]; })
+        .key(function(row) { return row[that.spec.global[mapping]]; })
         .entries(data)
-        .forEach(function(d) {
-          if (d.key === 'undefined') { d.key = undefined; }
-          if (index === mappings.length-1) { return }
-          that[mapping] = 
+        .forEach(function(group, index) {
+          var result = { key: group.key, parentIndex: parentIndex || 0 };
+          if (group.key !== 'undefined') { that[mapping].push(result); }
+          if (mapIndex < mappings.length) { nest(mapIndex+1, group.values, parentIndex); }
         });
     }
 
-    mappings.forEach(function(mapping) {
-      d3.nest()
-    });
-
-
-    this.facetY = d3.nest()
-      .key(function(d) { return d[that.spec.facetY]; })
-      .entries(this.data)
-      .map(function(facetY) {
-        if (facetY.key === 'undefined') { facetY.key = undefined; }
-
-      });
+    nest(0, this.data);
   };
 
 
