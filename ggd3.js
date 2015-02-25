@@ -50,7 +50,8 @@
     height: undefined,
     x: undefined,
     y: undefined,
-    group: undefined,
+    color: undefined,
+    size: undefined,
     facet: undefined,
     facetX: undefined,
     facetY: undefined
@@ -128,7 +129,34 @@
   // data applied, that data may be mapped to components.
 
   Graphic.prototype.mapData = function() {
+    var that = this;
 
+    var mappings = ['facetY', 'facetX', 'facet', 'color', 'size', 'x', 'y'];
+
+    function nest(mapping, data, index) {
+      that[mapping] = [];
+      d3.nest()
+        .key(function(d) { return d[mapping]; })
+        .entries(data)
+        .forEach(function(d) {
+          if (d.key === 'undefined') { d.key = undefined; }
+          if (index === mappings.length-1) { return }
+          that[mapping] = 
+        });
+    }
+
+    mappings.forEach(function(mapping) {
+      d3.nest()
+    });
+
+
+    this.facetY = d3.nest()
+      .key(function(d) { return d[that.spec.facetY]; })
+      .entries(this.data)
+      .map(function(facetY) {
+        if (facetY.key === 'undefined') { facetY.key = undefined; }
+
+      });
   };
 
 
