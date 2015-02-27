@@ -36,6 +36,7 @@
     var graphic = new Graphic();
     graphic.configure(spec);
     graphic.applyData(data);
+    graphic.mapData(this.data);
     return graphic;
   };
 
@@ -63,7 +64,9 @@
   // A new Graphic contains all the methods that 
   // configure and render an SVG. 
 
-  var Graphic = function() {};
+  var Graphic = function() {
+    this.el = d3.select(document.createElement('div'));
+  };
 
 
   // Configure
@@ -97,9 +100,9 @@
   Graphic.prototype.applyData = function() {
     var data = [];
 
-    // If only one dataset was passed, set this.data.
+    // If one dataset was passed in, assign it to this.data.
     if (arguments.length === 1) {
-      var dataset = arguments[0];
+      var dataset = arguments[0] || [];
       if (_.isArray(dataset))       { this.data = dataset; }
       else if (_.isObject(dataset)) { this.data = dataset.values; }
       return this;
@@ -131,25 +134,38 @@
   Graphic.prototype.mapData = function() {
     var that = this;
 
-    var mappings = ['facetY', 'facetX', 'facet', 'color', 'size'];
+    var mappings = ['facetY', 'facetX', 'facet', 'group'];
+    var mapping, result;
 
     // Use d3.nest() to perform a GroupBy of the dataset.
-    // The result is a list of keys
+    // This whole block needs refactoring for clarity.
+    nest(0, this.data);
     function nest(mapIndex, data, parentIndex) {
       var mapping = mappings[mapIndex];
-      that[mapping] = [];
+      if (!mapping) { return; }
 
       d3.nest()
         .key(function(row) { return row[that.spec.global[mapping]]; })
         .entries(data)
         .forEach(function(group, index) {
-          var result = { key: group.key, parentIndex: parentIndex || 0 };
-          if (group.key !== 'undefined') { that[mapping].push(result); }
-          if (mapIndex < mappings.length) { nest(mapIndex+1, group.values, parentIndex); }
-        });
-    }
 
-    nest(0, this.data);
+          mapping = mappings[mapIndex];
+          if (!that[mapping]) { that[mapping] = []; }
+
+          result = {
+            key: that.spec.global[mapping], 
+            value: group.key,
+            parentIndex: parentIndex || 0 
+          };
+
+          // Add result to instance and recurse;
+          if (group.key !== 'undefined') { that[mapping].push(result); }
+          nest(mapIndex+1, group.values, parentIndex);
+        });
+        
+    }
+    console.log(this)
+    return this;
   };
 
 
@@ -162,14 +178,31 @@
     if (width)  { this.spec.global.width = width; }
     if (height) { this.spec.global.height = height; }
 
-    // This will throw an error if "el" is not set else if
-    // width OR height are not set.
+    var noDimensions = (!el && (!width && !height));
+    if (noDimensions) { throw Error('An element or height & width must be specified.'); }
 
     if (this.spec.global.el) { el = d3.select(this.spec.global.el); }
     width = this.spec.global.width   || parseInt(el.style('width'));
     height = this.spec.global.height || parseInt(el.style('height'));
 
-    this.facets.draw();
+    var svg = this.el.append('svg')
+      .attr('width', width)
+      .attr('height', height)
+      .attr('class', 'graphic');
+
+    this.drawFacetY(svg, width, height);
+  };
+
+
+  // Y facets divide the svg horizontally. Each facet gets an
+  // equal share of the canvas.
+  Graphic.prototype.drawFacetY = function(svg, width, height) {
+
+    var notFaceted = _.isEmpty(this.facetY);
+    if (notFaceted) { }
+    _.each(this.facetY, function(facet) {
+
+    });
   };
 
 

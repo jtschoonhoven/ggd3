@@ -96,14 +96,24 @@ describe('applyData', function() {
   });
 
 
-  describe('Map data', function() {
+  describe.skip('Map data', function() {
 
     it('to x-facets', function() {
       var spec = { facetX: 'country' };
       var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
       var graphic = ggd3.create(spec, data);
-      graphic.mapData();
-      // console.log(graphic.facets);
+    });
+
+  });
+
+
+  describe('Draw', function() {
+
+    it('...', function() {
+      var spec = { facetY: 'country' };
+      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
+      var graphic = ggd3.create(spec, data);
+      graphic.draw(null, 20, 20)
     });
 
   });
