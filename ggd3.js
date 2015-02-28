@@ -138,7 +138,7 @@
     var mapping, result;
 
     // Use d3.nest() to perform a GroupBy of the dataset.
-    // This whole block needs refactoring for clarity.
+    // This whole block needs refactoring/commenting for clarity.
     nest(0, this.data);
     function nest(mapIndex, data, parentIndex) {
       var mapping = mappings[mapIndex];
@@ -161,10 +161,9 @@
           // Add result to instance and recurse;
           if (group.key !== 'undefined') { that[mapping].push(result); }
           nest(mapIndex+1, group.values, parentIndex);
-        });
-        
+        });   
     }
-    console.log(this)
+
     return this;
   };
 
@@ -196,13 +195,16 @@
 
   // Y facets divide the svg horizontally. Each facet gets an
   // equal share of the canvas.
-  Graphic.prototype.drawFacetY = function(svg, width, height) {
+  Graphic.prototype.drawFacetY = function(svg, svgWidth, svgHeight) {
+    var facetHeight = svgHeight / (this.facetY.length || 1);
 
-    var notFaceted = _.isEmpty(this.facetY);
-    if (notFaceted) { }
-    _.each(this.facetY, function(facet) {
-
-    });
+    var facetY = svg.selectAll('g.facetY')
+      .data(this.facetY)
+      .enter().append('g')
+      .attr('class', 'facetY')
+      .attr('transform', function(d,i) {
+        return 'translate(' + (facetHeight * i) + ')';
+      });
   };
 
 
