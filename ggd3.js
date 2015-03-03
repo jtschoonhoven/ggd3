@@ -67,7 +67,8 @@
     size: undefined,
     facet: undefined,
     facetX: undefined,
-    facetY: undefined
+    facetY: undefined,
+    geometry: 'point'
   };
 
 
@@ -270,6 +271,9 @@
     var numRows = ratio >= 1 ? Math.floor(width/height) : Math.ceil(ratio/numFacets);
     var numCols = Math.ceil(numFacets/numRows);
 
+    var facetWidth = width/numCols;
+    var facetHeight = height/numRows;
+
     var data = this.facet;
     if (_.isEmpty(data)) { data = [{}]; }
 
@@ -282,10 +286,25 @@
       .attr('transform', function(d,i) {
         var colNum = i % ratio;
         var rowNum = Math.floor(i/ratio);
-        return 'translate('+ (colNum/numCols)*width +','+ (rowNum/numRows)*height +')';
+        return 'translate('+ (colNum * facetWidth) +','+ (rowNum * facetHeight) +')';
       });
 
-    // this.drawFacetFlow(svg, width, facetHeight);
+    this.drawGroup(facetFlow, facetWidth, facetHeight);
+  };
+
+
+  // Groups organize data points. E.g. each separate line on a line
+  // chart is a group of data.
+  Graphic.prototype.drawGroup = function(facet, width, height) {
+    var data = this.group;
+    if (_.isEmpty(data)) { data = [{}]; }
+
+    var group = facet.selectAll('g.group')
+      .data(data)
+      .enter().append('g')
+      .attr('class', 'group')
+      .attr('data-key', function(d) { return d.key; })
+      .attr('data-value', function(d) { return d.value; });
   };
 
 
