@@ -20,6 +20,14 @@ if (typeof module !== 'undefined' && module.exports) {
 
 var expect = chai.expect;
 
+// Add a method to d3.selection that returns number 
+// of elements in selection.
+d3.selection.prototype.size = function() {
+  var n = 0;
+  this.each(function() { ++n; });
+  return n;
+};
+
 
 describe('configure', function() {
 
@@ -96,22 +104,63 @@ describe('applyData', function() {
   });
 
 
-  describe.skip('Map data', function() {
+  describe('y-facets', function() {
 
-    it('to x-facets', function() {
-      var spec = { facetX: 'country' };
-      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
-      var graphic = ggd3.create(spec, data);
+    var data = [
+      { country: 'AA', units: 1 }, 
+      { country: 'BB', units: 2 }, 
+      { country: 'CC', units: 3 }
+    ];
+
+    var graphic = ggd3.create(null, data);
+
+    it('are created even if not mapped to data', function() {
+      graphic.mapData().draw(null, 10, 60);
+      var yFacets = graphic.el.selectAll('g.facetY');
+      expect(yFacets.size()).to.equal(1);
+    });
+
+    it.skip('are created for each unique value in grouping', function() {
+      var spec = { facetY: 'country' };
+      graphic.configure(spec).mapData().draw(null, 10, 60);
+      var yFacets = graphic.el.selectAll('g.facetY');
+      expect(yFacets.size()).to.equal(3);
+    });
+
+    it.skip('evenly divide the vertical space of the svg', function() {
+      var graphic = ggd3.create({ facetY: 'country' }, data);
+      graphic.draw(null, 10, 60);
+      var yFacets = graphic.el.selectAll('g.facetY');
+      yFacets.each(function(facet) {
+        var height = parseInt(facet.style('height'));
+        console.log(height)
+      });
     });
 
   });
 
 
-  describe('Draw', function() {
+  describe('', function() {
 
-    it('...', function() {
+    it('facetY', function() {
       var spec = { facetY: 'country' };
       var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
+      var graphic = ggd3.create(spec, data);
+      graphic.draw(null, 20, 20)
+      console.log(graphic.el.html());
+    });
+
+    it('facetX', function() {
+      var spec = { facetX: 'country' };
+      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
+      var graphic = ggd3.create(spec, data);
+      graphic.draw(null, 20, 20)
+      console.log(graphic.el.html());
+    });
+
+    it('facetFlow', function() {
+      var spec = { facet: 'country' };
+      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }, { country: 'BB', units: 2 }];
       var graphic = ggd3.create(spec, data);
       graphic.draw(null, 20, 20)
       console.log(graphic.el.html());

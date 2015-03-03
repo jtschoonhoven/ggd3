@@ -36,7 +36,19 @@
     var graphic = new Graphic();
     graphic.configure(spec);
     graphic.applyData(data);
-    graphic.mapData(this.data);
+    graphic.mapData(graphic.data);
+
+    // If the graphic's dimensions were specified
+    // or if they can be retrieved from "el", go
+    // ahead and call graphic.draw.
+
+    var el     = graphic.spec.global.el;
+    var width  = graphic.spec.global.width;
+    var height = graphic.spec.global.height;
+
+    var hasDimensions = el || (height && width);
+    if (hasDimensions) { graphic.draw(el, width, height); }
+
     return graphic;
   };
 
@@ -184,7 +196,9 @@
     width = this.spec.global.width   || parseInt(el.style('width'));
     height = this.spec.global.height || parseInt(el.style('height'));
 
-    var svg = this.el.append('svg')
+    var svg = this.el.selectAll('svg')
+      .data([1])
+      .enter().append('svg')
       .attr('width', width)
       .attr('height', height)
       .attr('class', 'graphic');
@@ -195,16 +209,83 @@
 
   // Y facets divide the svg horizontally. Each facet gets an
   // equal share of the canvas.
-  Graphic.prototype.drawFacetY = function(svg, svgWidth, svgHeight) {
-    var facetHeight = svgHeight / (this.facetY.length || 1);
+  Graphic.prototype.drawFacetY = function(svg, width, height) {
+    var facetHeight = height / (this.facetY.length || 1);
+
+    // Even if y facets weren't defined we still want to create
+    // an element for them (to hold x & flow facets). If data
+    // is empty, bind yFacet element to an empty object.
+
+    var data = this.facetY;
+    if (_.isEmpty(data)) { data = [{}]; }
 
     var facetY = svg.selectAll('g.facetY')
-      .data(this.facetY)
+      .data(data)
       .enter().append('g')
       .attr('class', 'facetY')
+      .attr('data-key', function(d) { return d.key; })
+      .attr('data-value', function(d) { return d.value; })
       .attr('transform', function(d,i) {
-        return 'translate(' + (facetHeight * i) + ')';
+        return 'translate('+ (facetHeight * i) +',0)';
       });
+
+    this.drawFacetX(facetY, width, facetHeight);
+  };
+
+
+  // X facets divide each Y facet vertically. Each x facet gets
+  // an equal share of each y facet.
+  Graphic.prototype.drawFacetX = function(facetY, width, height) {
+    var facetWidth = width / (this.facetX.length || 1);
+
+    var data = this.facetX;
+    if (_.isEmpty(data)) { data = [{}]; }
+
+    var facetX = facetY.selectAll('g.facetX')
+      .data(data)
+      .enter().append('g')
+      .attr('class', 'facetX')
+      .attr('data-key', function(d) { return d.key; })
+      .attr('data-value', function(d) { return d.value; })
+      .attr('transform', function(d,i) {
+        return 'translate(0,'+ (facetWidth * i) +')';
+      });
+
+    this.drawFacetFlow(facetX, facetWidth, height);
+  };
+
+
+  // Flow facets (elsewhere just called "facets") divide up the canvas
+  // as evenly as possible.
+  Graphic.prototype.drawFacetFlow = function(facetX, width, height) {
+    var numFacets = this.facet.length || 1;
+
+    // To calculate best fit, first we have to determine the ratio
+    // of width:height to use for each facet.
+    var widerThanTall = width/height >=1;
+    var ratio = widerThanTall ? Math.floor(width/height) : 1/Math.floor(height/width);
+
+    // Now that we have the ratio along with the actual dimensions 
+    // of the canvas, we can calculate the total number of rows & cols.
+    var numRows = ratio >= 1 ? Math.floor(width/height) : Math.ceil(ratio/numFacets);
+    var numCols = Math.ceil(numFacets/numRows);
+
+    var data = this.facet;
+    if (_.isEmpty(data)) { data = [{}]; }
+
+    var facetFlow = facetX.selectAll('g.facetFlow')
+      .data(data)
+      .enter().append('g')
+      .attr('class', 'facetFlow')
+      .attr('data-key', function(d) { return d.key; })
+      .attr('data-value', function(d) { return d.value; })
+      .attr('transform', function(d,i) {
+        var colNum = i % ratio;
+        var rowNum = Math.floor(i/ratio);
+        return 'translate('+ (colNum/numCols)*width +','+ (rowNum/numRows)*height +')';
+      });
+
+    // this.drawFacetFlow(svg, width, facetHeight);
   };
 
 
