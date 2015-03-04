@@ -68,7 +68,9 @@
     facet: undefined,
     facetX: undefined,
     facetY: undefined,
-    geometry: 'point'
+    geometry: 'point',
+    floatFacetScaleX: false,
+    floatFacetScaleY: false
   };
 
 
@@ -147,33 +149,28 @@
   Graphic.prototype.mapData = function() {
     var that = this;
 
-    var mappings = ['facetY', 'facetX', 'facet', 'group'];
+    var mappings = ['facetY', 'facetX', 'facet', 'group', 'geometry'];
     var mapping, result;
 
+    // Add an empty array to graphic for each mapping.
+    mappings.forEach(function(mapping) { that[mapping] = []; });
+
     // Use d3.nest() to perform a GroupBy of the dataset.
-    // This whole block needs refactoring/commenting for clarity.
     nest(0, this.data);
-    function nest(mapIndex, data, parentIndex) {
+    function nest(mapIndex, data) {
       var mapping = mappings[mapIndex];
-      if (!mapping) { return; }
 
       d3.nest()
         .key(function(row) { return row[that.spec.global[mapping]]; })
         .entries(data)
         .forEach(function(group, index) {
+          if (mapping === 'geometry') { that.geometry.push(group.values); }
 
-          mapping = mappings[mapIndex];
-          if (!that[mapping]) { that[mapping] = []; }
-
-          result = {
-            key: that.spec.global[mapping], 
-            value: group.key,
-            parentIndex: parentIndex || 0 
-          };
-
-          // Add result to instance and recurse;
-          if (group.key !== 'undefined') { that[mapping].push(result); }
-          nest(mapIndex+1, group.values, parentIndex);
+          else { 
+            result = { key: that.spec.global[mapping], value: group.key };
+            if (group.key !== 'undefined') { that[mapping].push(result); }
+            nest(mapIndex+1, group.values);
+          }
         });   
     }
 
@@ -213,7 +210,7 @@
   Graphic.prototype.drawFacetY = function(svg, width, height) {
     var facetHeight = height / (this.facetY.length || 1);
 
-    // Even if y facets weren't defined we still want to create
+    // Even if y facets aren't defined we still want to create
     // an element for them (to hold x & flow facets). If data
     // is empty, bind yFacet element to an empty object.
 
@@ -277,10 +274,10 @@
     var data = this.facet;
     if (_.isEmpty(data)) { data = [{}]; }
 
-    var facetFlow = facetX.selectAll('g.facetFlow')
+    var facetFlow = facetX.selectAll('g.facet')
       .data(data)
       .enter().append('g')
-      .attr('class', 'facetFlow')
+      .attr('class', 'facet')
       .attr('data-key', function(d) { return d.key; })
       .attr('data-value', function(d) { return d.value; })
       .attr('transform', function(d,i) {
@@ -305,6 +302,32 @@
       .attr('class', 'group')
       .attr('data-key', function(d) { return d.key; })
       .attr('data-value', function(d) { return d.value; });
+
+    this.drawPointGeometry(group, width, height);
+  };
+
+
+  Graphic.prototype.drawPointGeometry = function(group, width, height) {
+    var that = this;
+
+    // Users might want to change geometry types without having to 
+    // pass in arguments to the functions. Set vars here if undefined.
+    group = group   || d3.selectAll('g.group');
+    width = width   || parseInt(group.style('width'));
+    height = height || parseInt(group.style('height'));
+
+    d3.selectAll(group).each(function(datum, index) {
+      var data = that.geometry[index];
+      var selection = d3.selectAll(this);
+
+      selection.selectAll('circle.point')
+        .data(data)
+        .enter().append('circle')
+        .attr('class', 'point')
+        .attr('r', 2)
+        .attr('cx', 20)
+        .attr('cy', 20)
+    });
   };
 
 
