@@ -3,9 +3,27 @@ var gulp       = require('gulp')
 ,   gutil      = require('gulp-util')
 ,   bower      = require('gulp-bower')
 ,   bowerFiles = require('main-bower-files')
+,   concat     = require('gulp-concat')
+,   wrap       = require('gulp-wrap')
+,   indent     = require('gulp-indent')
+,   sourcemaps = require('gulp-sourcemaps')
 ,   jshint     = require('gulp-jshint')
 ,   stylish    = require('jshint-stylish')
 ,   mocha      = require('gulp-mocha');
+
+
+var sourceFiles = ['lib/index.js'];
+
+// Build sourcemaps, concat files, and wrap in function.
+gulp.task('concat', function() {
+  return gulp.src(sourceFiles)
+    .pipe(sourcemaps.init())
+    .pipe(indent())
+    .pipe(concat('ggd3.js'))
+    .pipe(wrap('(function() {\n<%= contents %>\n})()'))
+    .pipe(sourcemaps.write('.'))
+    .pipe(gulp.dest('.'));
+});
 
 
 // Do all setup tasks.
