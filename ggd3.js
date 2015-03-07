@@ -35,9 +35,9 @@
     // or if they can be retrieved from "el", go
     // ahead and call graphic.draw.
   
-    var el     = graphic.spec.global.el;
-    var width  = graphic.spec.global.width;
-    var height = graphic.spec.global.height;
+    var el     = graphic.spec.el;
+    var width  = graphic.spec.width;
+    var height = graphic.spec.height;
   
     var hasDimensions = el || (height && width);
     if (hasDimensions) { graphic.draw(el, width, height); }
@@ -46,7 +46,7 @@
   };
   
   
-  ggd3.defaults = {
+  var defaults = {
     title: undefined,
     el: undefined,
     width: undefined,
@@ -63,23 +63,8 @@
     floatFacetScaleY: false
   };
   
-  
   Graphic.prototype.configure = function(spec) {
-    if (!spec) { spec = {}; }
-  
-    // Properties at the top level of spec are "global".
-    var components = ['global', 'facets', 'groups', 'shapes'];
-    var globalSpecs = _.omit(spec || {}, components);
-  
-    // Fill in values in spec from defaults & globals.
-    spec.global = _.defaults(spec.global || {}, globalSpecs, ggd3.defaults);
-    spec.facets = _.defaults(spec.facets || {}, globalSpecs, ggd3.defaults);
-    spec.groups = _.defaults(spec.groups || {}, globalSpecs, ggd3.defaults);
-    spec.shapes = _.defaults(spec.shapes || {}, globalSpecs, ggd3.defaults);
-  
-    // Filter out any noncomponent specs & apply.
-    spec = _.pick(spec, components);
-    this.spec = spec;
+    this.spec = _.defaults(spec || {}, defaults)
     return this;
   };
   
@@ -140,13 +125,13 @@
       var mapping = mappings[mapIndex];
   
       d3.nest()
-        .key(function(row) { return row[that.spec.global[mapping]]; })
+        .key(function(row) { return row[that.spec[mapping]]; })
         .entries(data)
         .forEach(function(group, index) {
           if (mapping === 'geometry') { that.geometry.push(group.values); }
   
           else { 
-            result = { key: that.spec.global[mapping], value: group.key };
+            result = { key: that.spec[mapping], value: group.key };
             if (group.key !== 'undefined') { that[mapping].push(result); }
             nest(mapIndex+1, group.values);
           }
@@ -162,16 +147,16 @@
   // ----------------------------------------------------
   
   Graphic.prototype.draw = function(el, width, height) {
-    if (el)     { this.spec.global.el = el; }
-    if (width)  { this.spec.global.width = width; }
-    if (height) { this.spec.global.height = height; }
+    if (el)     { this.spec.el = el; }
+    if (width)  { this.spec.width = width; }
+    if (height) { this.spec.height = height; }
   
     var noDimensions = (!el && (!width && !height));
     if (noDimensions) { throw Error('An element or height & width must be specified.'); }
   
-    if (this.spec.global.el) { el = d3.select(this.spec.global.el); }
-    width = this.spec.global.width   || parseInt(el.style('width'));
-    height = this.spec.global.height || parseInt(el.style('height'));
+    if (this.spec.el) { el = d3.select(this.spec.el); }
+    width = this.spec.width   || parseInt(el.style('width'));
+    height = this.spec.height || parseInt(el.style('height'));
   
     var svg = this.el.selectAll('svg')
       .data([1])
