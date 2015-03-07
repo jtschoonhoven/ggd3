@@ -1,4 +1,3 @@
-
 var gulp       = require('gulp')
 ,   gutil      = require('gulp-util')
 ,   bower      = require('gulp-bower')
@@ -12,17 +11,34 @@ var gulp       = require('gulp')
 ,   mocha      = require('gulp-mocha');
 
 
-var sourceFiles = ['lib/index.js'];
+// These will be combined into a single file.
+var sourceFiles = [
+  'lib/index.js', 
+  'lib/configure.js', 
+  'lib/applyData.js', 
+  'lib/mapData.js',
+  'lib/draw.js',
+  'lib/export.js'
+];
+
+var testFiles = './test/*.js';
+
 
 // Build sourcemaps, concat files, and wrap in function.
 gulp.task('concat', function() {
   return gulp.src(sourceFiles)
     .pipe(sourcemaps.init())
+    .pipe(concat('ggd3.js', { newLine: '\n\n\n' }))
     .pipe(indent())
-    .pipe(concat('ggd3.js'))
-    .pipe(wrap('(function() {\n<%= contents %>\n})()'))
+    .pipe(wrap('(function() {\n\n<%= contents %>\n\n})()'))
     .pipe(sourcemaps.write('.'))
     .pipe(gulp.dest('.'));
+});
+
+
+// Recompile on change.
+gulp.task('watch', ['concat'], function() {
+  return gulp.watch(sourceFiles, ['concat']);
 });
 
 
@@ -36,7 +52,7 @@ gulp.task('bower-install', function() {
 });
 
 
-// Move "main" bower js files to vendor folder.
+// Move main bower files to vendor folder.
 gulp.task('bower-build', function() {
   return gulp.src(bowerFiles({ includeDev: true }))
     .pipe(gulp.dest('vendor'));
@@ -44,22 +60,24 @@ gulp.task('bower-build', function() {
 
 
 // Watch ggd3 for changes and run tests on save.
-gulp.task('watch', ['test'], function() {
+gulp.task('watch-test', ['test'], function() {
   return gulp.watch(['ggd3.js', 'test/test.js'], ['test']);
 });
 
 
 // Run test and lint.
-gulp.task('test', ['lint'], function() {
-  gulp.src('./test/test.js', { read: false })
+gulp.task('test', ['mocha', 'lint']);
+
+
+gulp.task('mocha', function() {
+  gulp.src(testFiles, { read: false })
     .pipe(mocha({ reporter: 'spec' }))
-    .on('error', function(err) { return gutil.log(err.stack || err.message); });
+    .on('error', function(err) { return gutil.log(err.stack || err.message); })
 });
 
 
-// Lint test.
 gulp.task('lint', function() {
-  return gulp.src(['ggd3.js', 'test.js'])
+  return gulp.src(sourceFiles.concat([testFiles]))
     .pipe(jshint({ expr: true }))
     .pipe(jshint.reporter(stylish));
 });
