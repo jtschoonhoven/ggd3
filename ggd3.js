@@ -3,16 +3,17 @@
   // Configure for Node and the browser.
   var isNode = false;
   if (typeof module !== 'undefined' && module.exports) {
-    isNode = true; 
-    this.d3 = require('d3');
-    this._  = require('underscore');
+    var d3    = require('d3');
+    var _     = require('underscore');
+    var async = require('async');
   
     // Uses jsdom to build HTML server side.
+    isNode   = true; 
     document = require('jsdom').jsdom();
-    window = document.parentWindow;
+    window   = document.parentWindow;
   }
   
-  if (!d3 || !_) { throw 'ggd3 requires D3 and Underscore.'; }
+  if (!d3 || !_ || !async) { throw 'ggd3 requires D3, Async, and Underscore.'; }
   
   
   var ggd3 = {};
@@ -29,7 +30,7 @@
     var graphic = new Graphic();
     graphic.configure(spec);
     graphic.applyData(data);
-    graphic.mapData(graphic.data);
+    graphic.mapData();
   
     // If the graphic's dimensions were specified
     // or if they can be retrieved from "el", go
@@ -46,7 +47,7 @@
   };
   
   
-  var defaults = {
+  ggd3.defaults = {
     title: undefined,
     el: undefined,
     width: undefined,
@@ -64,10 +65,9 @@
   };
   
   Graphic.prototype.configure = function(spec) {
-    this.spec = _.defaults(spec || {}, defaults)
+    this.spec = _.defaults(spec || {}, ggd3.defaults)
     return this;
   };
-  
   
   
   // Apply Data
@@ -84,6 +84,7 @@
       if (_.isArray(dataset))       { this.data = dataset; }
       else if (_.isObject(dataset)) { this.data = dataset.values; }
       return this;
+      
     }
   
     // If multiple sets were passed in, join them.
@@ -104,42 +105,91 @@
   };
   
   
-  
-  // Map Data to Components
-  // ----------------------------------------------------
-  // Once the graphic has been configured and has had
-  // data applied, that data may be mapped to components.
-  
-  Graphic.prototype.mapData = function() {
-    var that = this;
-  
-    var mappings = ['facetY', 'facetX', 'facet', 'group', 'geometry'];
-    var mapping, result;
-  
-    // Add an empty array to graphic for each mapping.
-    mappings.forEach(function(mapping) { that[mapping] = []; });
-  
-    // Use d3.nest() to perform a GroupBy of the dataset.
-    nest(0, this.data);
-    function nest(mapIndex, data) {
-      var mapping = mappings[mapIndex];
-  
-      d3.nest()
-        .key(function(row) { return row[that.spec[mapping]]; })
-        .entries(data)
-        .forEach(function(group, index) {
-          if (mapping === 'geometry') { that.geometry.push(group.values); }
-  
-          else { 
-            result = { key: that.spec[mapping], value: group.key };
-            if (group.key !== 'undefined') { that[mapping].push(result); }
-            nest(mapIndex+1, group.values);
-          }
-        });   
-    }
-  
-    return this;
+  // Map Data to Components.
+  Graphic.prototype.mapData = function(done) {
+    this.yFacets    = [];
+    this.xFacets    = [];
+    this.facets     = [];
+    this.groups     = [];
+    this.geometries = [];
+    mapYFacets.call(this, this.data, function() {
+      if (done) { done(); }
+    });
   };
+  
+  
+  // Like an SQL group by, D3's nest organizes the given
+  // dataset by key. Each group is sent to iterator.
+  function nest(data, key, iterator, done) {
+    var nestedData = d3.nest()
+      .key(function(row) { return row[key]; })
+      .entries(data)
+    async.each(nestedData, iterator, done);
+  }
+  
+  
+  function mapYFacets(data, done) {
+    var that = this;
+    var key  = this.spec.facetY
+  
+    nest(data, key, function(nested, cb) {
+      var yFacet = { key: key, value: nested.key };
+      if (nested.key !== 'undefined') { that.yFacets.push(yFacet); }
+      mapXFacets.call(that, nested.values, cb);
+    }, 
+    done);
+  }
+  
+  
+  function mapXFacets(data, done) {
+    var that = this;
+    var key  = this.spec.facetX;
+  
+    nest(data, key, function(nested, cb) {
+      var xFacet = { key: key, value: nested.key };
+      if (nested.key !== 'undefined') { that.xFacets.push(xFacet); }
+      mapFlowFacets.call(that, nested.values, cb);
+    }, 
+    done);
+  }
+  
+  
+  function mapFlowFacets(data, done) {
+    var that = this;
+    var key  = this.spec.facet;
+  
+    nest(data, key, function(nested, cb) {
+      var facet = { key: key, value: nested.key };
+      if (nested.key !== 'undefined') { that.facets.push(facet); }
+      mapGroups.call(that, nested.values, cb);
+    }, 
+    done);
+  }
+  
+  
+  function mapGroups(data, done) {
+    var that = this;
+    var key  = this.spec.group;
+  
+    nest(data, key, function(nested, cb) {
+      var group = { key: key, value: nested.key };
+      if (nested.key !== 'undefined') { that.group.push(group); }
+      mapGeometries.call(that, nested.values, cb);
+    }, 
+    done);
+  }
+  
+  
+  function mapGeometries(data, done) {
+    var that = this;
+    var key  = this.spec.geometry;
+    
+    nest(data, key, function(nested, cb) {
+      that.geometries.push(nested.values);
+      cb();
+    }, 
+    done);
+  }
   
   
   
