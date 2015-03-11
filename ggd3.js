@@ -20,16 +20,18 @@
   ggd3.VERSION = '0.0.0';
   
   
-  // Each chart is an instance of Graphic.
   var Graphic = function() {
     this.el = d3.select(document.createElement('div'));
+    this.stats = {};
+    this.data = [];
+    this.applyData = function(data) { this.data = data; }
   };
   
   
   ggd3.create = function(spec, data) {
     var graphic = new Graphic();
     graphic.configure(spec);
-    graphic.applyData(data);
+    graphic.analyzeData();
     graphic.mapData();
   
     // If the graphic's dimensions were specified
@@ -48,10 +50,18 @@
   
   
   ggd3.defaults = {
+  
+    // Display a title above the chart.
     title: undefined,
+  
+    // Selector for destination graphic.
     el: undefined,
+  
+    // Draw a graphic of these dimensions, else inherit from el.
     width: undefined,
     height: undefined,
+  
+    // Map column names to attributes/components.
     x: undefined,
     y: undefined,
     color: undefined,
@@ -59,49 +69,28 @@
     facet: undefined,
     facetX: undefined,
     facetY: undefined,
+  
+    // Geoms may be point, line, or bar (more to come).
     geometry: 'point',
+  
+    // If true, each facet will scale its x-axis independently.
     floatFacetScaleX: false,
-    floatFacetScaleY: false
+    floatFacetScaleY: false,
+  
+    // Datatypes may be string, number, or time.
+    xType: undefined,
+    yType: undefined,
+    colorType: undefined,
+    sizeType: undefined,
+    facetType: undefined,
+    facetXType: undefined,
+    facetYType: undefined
   };
   
-  Graphic.prototype.configure = function(spec) {
+  
+  Graphic.prototype.configure = function(spec, done) {
     this.spec = _.defaults(spec || {}, ggd3.defaults)
-    return this;
-  };
-  
-  
-  // Apply Data
-  // ----------------------------------------------------
-  // Raw data may be passed in as an array. Or a named
-  // dataset may be passed as { key: '', values: [] }.
-  
-  Graphic.prototype.applyData = function() {
-    var data = [];
-  
-    // If one dataset was passed in, assign it to this.data.
-    if (arguments.length === 1) {
-      var dataset = arguments[0] || [];
-      if (_.isArray(dataset))       { this.data = dataset; }
-      else if (_.isObject(dataset)) { this.data = dataset.values; }
-      return this;
-      
-    }
-  
-    // If multiple sets were passed in, join them.
-    _.each(arguments, function(dataset, index) {
-      if (_.isArray(dataset)) {
-        _.each(dataset, function(row) { row.dataset = row.dataset || index });
-        data = data.concat(dataset);
-      }
-  
-      else if (_.isObject(dataset)) {
-        _.each(dataset.values, function(row) { row.dataset = row.dataset || dataset.key || index });
-        data = data.concat(dataset.values);
-      }
-    });
-  
-    this.data = data;
-    return this;
+    if (done) { done(); }
   };
   
   
@@ -112,9 +101,8 @@
     this.facets     = [];
     this.groups     = [];
     this.geometries = [];
-    mapYFacets.call(this, this.data, function() {
-      if (done) { done(); }
-    });
+  
+    mapYFacets.call(this, this.data, function() { if (done) { done(); } });
   };
   
   
@@ -124,20 +112,29 @@
     var nestedData = d3.nest()
       .key(function(row) { return row[key]; })
       .entries(data)
-    async.each(nestedData, iterator, done);
+  
+    // Apply iterator to each group, then callback with nestedData.
+    async.each(nestedData, iterator, function() { done(nestedData); });
   }
   
   
   function mapYFacets(data, done) {
     var that = this;
-    var key  = this.spec.facetY
+    var key  = this.spec.facetY;
   
     nest(data, key, function(nested, cb) {
       var yFacet = { key: key, value: nested.key };
       if (nested.key !== 'undefined') { that.yFacets.push(yFacet); }
       mapXFacets.call(that, nested.values, cb);
-    }, 
-    done);
+    },
+  
+    // After nest completes, calculate stats.
+    function() {
+      if (mapYFacets.length > 0) {
+        that.stats.extent = d3.extent()
+      }
+      done();
+    });
   }
   
   

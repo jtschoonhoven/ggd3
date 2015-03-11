@@ -36,6 +36,7 @@
     "gulp-wrap": "^0.11.0",
     "jshint-stylish": "^1.0.0",
     "main-bower-files": "^2.4.0",
-    "mocha": "^2.0.1"
+    "mocha": "^2.0.1",
+    "source-map-support": "^0.2.9"
   }
 }
