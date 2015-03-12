@@ -61,6 +61,12 @@
     width: undefined,
     height: undefined,
   
+    // If desired, min and max can be forced.
+    xMin: undefined,
+    xMax: undefined,
+    yMin: undefined,
+    yMax: undefined,
+  
     // Map column names to attributes/components.
     x: undefined,
     y: undefined,
@@ -73,9 +79,12 @@
     // Geoms may be point, line, or bar (more to come).
     geometry: 'point',
   
-    // If true, each facet will scale its x-axis independently.
+    // If true, each X/Y facet will scale its axis independently.
     floatFacetScaleX: false,
     floatFacetScaleY: false,
+  
+    // If true, each facet gets its own independently-scaled axis.
+    independentAxes: false,
   
     // Datatypes may be string, number, or time.
     xType: undefined,
@@ -90,8 +99,101 @@
   
   Graphic.prototype.configure = function(spec, done) {
     this.spec = _.defaults(spec || {}, ggd3.defaults)
-    if (done) { done(); }
+    if (done) { done(null, this.spec); }
   };
+  
+  
+  // Determine data types and some stats.
+  Graphic.prototype.analyzeData = function(data, done) {
+  
+  };
+  
+  
+  // A dataType will have to be determined for every attribute/component
+  // with length > 0 where a type has not already been set.
+  // Keys is an array of colnames that map to chart attributes.
+  function mapValidTypes(data, keys, done) {
+    
+    function eachRow(row, next) {
+      if (!_.isArray(keys)) { keys = [keys]; }
+      async.each(keys, function(key, cb) { eachKey(key, row, cb); }, next);
+    }
+  
+    function eachKey(key, row, next) {
+      getValidTypes(key, function(err, validTypes) { 
+        row[key] = validTypes;
+        next();
+      });
+    }
+  
+    async.each(data, eachRow, done);
+  }
+  
+  
+  // Returns object with parsed val for each type, undefined if unable to parse.
+  function getValidTypes(val, done) {
+    async.parallel([
+      async.apply(parseAsDate, val),
+      async.apply(parseAsNumber, val),
+      async.apply(parseAsString, val)
+    ],
+  
+    function(err, res) {
+      done(err, { datetime: res[0], number: res[1], string: res[2] }) ;
+    });
+  }
+  
+  
+  // Return a Date object or undefined if unable to parse.
+  function parseAsDate(val, done) {
+    if (val instanceof Date) { return done(null, val); }
+  
+    // Attempt to parse val with given length and format.
+    function tryParse(val, len, format) {
+      var isValid = typeof val === 'string'
+        && val.length === len 
+        && !!d3.time.format(format).parse(val);
+      return isValid ? d3.time.format(format).parse(val) : false;
+    }
+  
+    var parsed = tryParse(val, 4, '%Y')
+      || tryParse(val, 7,  '%Y-%m')
+      || tryParse(val, 10, '%Y-%m-%d')
+      || tryParse(val, 19, '%Y-%m-%d %H:%M:%S')
+      || tryParse(val, 24, '%Y-%m-%dT%H:%M:%S.%LZ')
+      || undefined;
+  
+    done(null, parsed);
+  }
+  
+  
+  // Return Number or false if unable to parse.
+  function parseAsNumber(val, done) {
+    var parsed;
+  
+    if (typeof val === 'number' && isFinite(val)) { done(null, val); }
+  
+    // Match integers decimals.
+    else if (typeof val === 'string' && /^[-+]?([0-9]*\.[0-9]+|[0-9]+)$/.test(val)) {
+      done(null, parseFloat(val));
+    }
+  
+    // Match integers/decimals ending in %, then divide by 100.
+    else if (typeof val === 'string' && /^[-+]?([0-9]*\.[0-9]+|[0-9]+)%$/.test(val)) {
+      done(null, parseFloat(val)/100);
+    }
+  
+    else { done(null, undefined); }
+  }
+  
+  
+  // If val is NaN, undefined, empty, or null, return undefined.
+  // In all other cases cast as string.
+  function parseAsString(val, done) {
+    if (typeof val === 'string') { done(null, val); }
+    else if (!val && val !== 0 && val !== false) { done(null, undefined); }
+    else { done(null, String(val)); }
+  }
   
   
   // Map Data to Components.
@@ -102,11 +204,18 @@
     this.groups     = [];
     this.geometries = [];
   
-    mapYFacets.call(this, this.data, function() { if (done) { done(); } });
+    // Unless facets are floated or independent, get min and max here.
+    if (!this.spec.independentAxes && !this.spec.floatFacetScaleY) {
+      var yExtent = d3.extent(this.data, function(row) { return row[that.spec.y]; });
+    }
+  
+    mapYFacets.call(this, this.data, function() { 
+      if (done) { done(); } 
+    });
   };
   
   
-  // Like an SQL group by, D3's nest organizes the given
+  // Like a SQL group by, D3's nest organizes the given
   // dataset by key. Each group is sent to iterator.
   function nest(data, key, iterator, done) {
     var nestedData = d3.nest()
@@ -119,32 +228,44 @@
   
   
   function mapYFacets(data, done) {
-    var that = this;
-    var key  = this.spec.facetY;
+    var that      = this;
+    var key       = this.spec.facetY;
   
     nest(data, key, function(nested, cb) {
       var yFacet = { key: key, value: nested.key };
-      if (nested.key !== 'undefined') { that.yFacets.push(yFacet); }
+  
+      // If y-facets are floated, we'll need the extent of each.
+      if (that.spec.floatFacetScaleY) {
+        yFacet.extent = d3.extent(nested.values, function(row) { return row[that.spec.y]; });
+      }
+  
+      // And unless they're independent, grab extent from spec.
+      else if (!that.spec.independentAxes) {
+        yFacet.extent = [that.spec.yMin, that.spec.yMax];
+      }
+  
+      that.yFacets.push(yFacet);
       mapXFacets.call(that, nested.values, cb);
     },
-  
-    // After nest completes, calculate stats.
-    function() {
-      if (mapYFacets.length > 0) {
-        that.stats.extent = d3.extent()
-      }
-      done();
-    });
+    done);
   }
   
   
   function mapXFacets(data, done) {
     var that = this;
-    var key  = this.spec.facetX;
+    var key  = this.spec.facetX;  
   
     nest(data, key, function(nested, cb) {
       var xFacet = { key: key, value: nested.key };
-      if (nested.key !== 'undefined') { that.xFacets.push(xFacet); }
+  
+      if (that.spec.floatFacetScaleY) {
+        xFacet.extent = d3.extent(nested.values, function(row) { return row[that.spec.x]; });
+      }
+      else if (!that.spec.independentAxes) {
+        xFacet.extent = [that.spec.xMin, that.spec.xMax];
+      }
+  
+      that.xFacets.push(xFacet);
       mapFlowFacets.call(that, nested.values, cb);
     }, 
     done);
@@ -237,6 +358,11 @@
       .attr('transform', function(d,i) {
         return 'translate('+ (facetHeight * i) +',0)';
       });
+  
+    // By default, y-axes are drawn at the left of each yFacet.
+    if (!this.spec.independentAxes) {
+      
+    }
   
     this.drawFacetX(facetY, width, facetHeight);
   };

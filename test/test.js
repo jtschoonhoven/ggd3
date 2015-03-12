@@ -30,87 +30,85 @@ d3.selection.prototype.size = function() {
   this.each(function() { ++n; });
   return n;
 };
+  
 
-describe('configure', function() {
+describe('defaults', function() {
   var graphic = ggd3.create();
 
-  describe('defaults', function() {
-
-      it('are used to fill in missing values for each component', function() {
-        graphic.configure({});
-        expect(graphic.spec).to.eql(ggd3.defaults);
-      });
-
-      it('do not overwrite user defined properties', function() {
-        graphic.configure({ title: 'Test' });
-        expect(graphic.spec.title).to.equal('Test');
-      });
+  it('are used to fill in missing values for each component', function() {
+    graphic.configure({});
+    expect(graphic.spec).to.eql(ggd3.defaults);
   });
+
+  it('do not overwrite user defined properties', function() {
+    graphic.configure({ title: 'Test' });
+    expect(graphic.spec.title).to.equal('Test');
+  });
+
 });
 
 
-  describe('y-facets', function() {
+describe('y-facets', function() {
 
-    var data = [
-      { country: 'AA', units: 1 }, 
-      { country: 'BB', units: 2 }, 
-      { country: 'CC', units: 3 }
-    ];
+  var data = [
+    { country: 'AA', units: 1 }, 
+    { country: 'BB', units: 2 }, 
+    { country: 'CC', units: 3 }
+  ];
 
-    var graphic = ggd3.create(null, data);
+  var graphic = ggd3.create(null, data);
 
-    it('are created even if not mapped to data', function() {
-      graphic.mapData(function() { console.log(graphic); })
-      graphic.draw(null, 10, 60);
-      var yFacets = graphic.el.selectAll('g.facetY');
-      expect(yFacets.size()).to.equal(1);
-    });
-
-    it.skip('are created for each unique value in grouping', function() {
-      var spec = { facetY: 'country' };
-      graphic.configure(spec).mapData().draw(null, 10, 60);
-      var yFacets = graphic.el.selectAll('g.facetY');
-      expect(yFacets.size()).to.equal(3);
-    });
-
-    it.skip('evenly divide the vertical space of the svg', function() {
-      var graphic = ggd3.create({ facetY: 'country' }, data);
-      graphic.draw(null, 10, 60);
-      var yFacets = graphic.el.selectAll('g.facetY');
-      yFacets.each(function(facet) {
-        var height = parseInt(facet.style('height'));
-        console.log(height)
-      });
-    });
-
+  it('are created even if not mapped to data', function() {
+    graphic.mapData(function() { console.log(graphic); })
+    graphic.draw(null, 10, 60);
+    var yFacets = graphic.el.selectAll('g.facetY');
+    expect(yFacets.size()).to.equal(1);
   });
 
-
-  describe.skip('', function() {
-
-    it('facetY', function() {
-      var spec = { facetY: 'country' };
-      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
-      var graphic = ggd3.create(spec, data);
-      graphic.draw(null, 20, 20)
-      console.log(graphic.el.html());
-    });
-
-    it('facetX', function() {
-      var spec = { facetX: 'country' };
-      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
-      var graphic = ggd3.create(spec, data);
-      graphic.draw(null, 20, 20)
-      console.log(graphic.el.html());
-    });
-
-    it('facetFlow', function() {
-      var spec = { facet: 'country' };
-      var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }, { country: 'BB', units: 2 }];
-      var graphic = ggd3.create(spec, data);
-      graphic.draw(null, 20, 20)
-      console.log(graphic.el.html());
-    });
-
+  it.skip('are created for each unique value in grouping', function() {
+    var spec = { facetY: 'country' };
+    graphic.configure(spec).mapData().draw(null, 10, 60);
+    var yFacets = graphic.el.selectAll('g.facetY');
+    expect(yFacets.size()).to.equal(3);
   });
+
+  it.skip('evenly divide the vertical space of the svg', function() {
+    var graphic = ggd3.create({ facetY: 'country' }, data);
+    graphic.draw(null, 10, 60);
+    var yFacets = graphic.el.selectAll('g.facetY');
+    yFacets.each(function(facet) {
+      var height = parseInt(facet.style('height'));
+      console.log(height)
+    });
+  });
+
+});
+
+
+describe.skip('', function() {
+
+  it('facetY', function() {
+    var spec = { facetY: 'country' };
+    var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
+    var graphic = ggd3.create(spec, data);
+    graphic.draw(null, 20, 20)
+    console.log(graphic.el.html());
+  });
+
+  it('facetX', function() {
+    var spec = { facetX: 'country' };
+    var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
+    var graphic = ggd3.create(spec, data);
+    graphic.draw(null, 20, 20)
+    console.log(graphic.el.html());
+  });
+
+  it('facetFlow', function() {
+    var spec = { facet: 'country' };
+    var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }, { country: 'BB', units: 2 }];
+    var graphic = ggd3.create(spec, data);
+    graphic.draw(null, 20, 20)
+    console.log(graphic.el.html());
+  });
+
 });
