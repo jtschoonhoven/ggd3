@@ -15,7 +15,7 @@ var gulp       = require('gulp')
 var sourceFiles = [
   'lib/index.js', 
   'lib/configure.js',
-  'lib/analyzeData.js',
+  'lib/parseData.js',
   'lib/mapData.js',
   'lib/draw.js',
   'lib/export.js'

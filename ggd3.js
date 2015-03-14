@@ -28,24 +28,39 @@
   };
   
   
-  ggd3.create = function(spec, data) {
+  ggd3.create = function(spec, data, done) {
     var graphic = new Graphic();
-    graphic.configure(spec);
-    graphic.analyzeData();
-    graphic.mapData();
   
-    // If the graphic's dimensions were specified
-    // or if they can be retrieved from "el", go
-    // ahead and call graphic.draw.
+    graphic.data = data || [];
+    graphic.spec = graphic.configure(spec);
   
-    var el     = graphic.spec.el;
-    var width  = graphic.spec.width;
-    var height = graphic.spec.height;
+    async.series([
+      function(cb) { graphic.parseData(data, spec, cb); },
+      
+      function(cb) { graphic.mapData(data, spec, function(err, mappings) {
+        graphic.mappings = mappings;
+        cb();
+      })},
   
-    var hasDimensions = el || (height && width);
-    if (hasDimensions) { graphic.draw(el, width, height); }
+      function(cb) { graphic.draw(data, spec, graphic.mappings, function(err, el) {
+        graphic.el = el
+      })}
+    ])
   
-    return graphic;
+    graphic.parseData(graphic.data, graphic.spec, function(err) {
+  
+    })
+  
+    if (done) {
+      async.waterfall([
+        async.apply(graphic.analyzeData, graphic.data, graphic.spec),
+        async.apply(graphic.mapData, graphic.data, graphic.spec),
+        async.apply(graphic.draw, graphic.data, graphic.spec, graphic.mappings)
+      ], 
+      done);
+    }
+  
+    else { return graphic; }
   };
   
   
@@ -98,13 +113,14 @@
   
   
   Graphic.prototype.configure = function(spec, done) {
-    this.spec = _.defaults(spec || {}, ggd3.defaults)
-    if (done) { done(null, this.spec); }
+    spec = _.defaults(spec || {}, ggd3.defaults)
+    if (done) { done(null, spec); }
+    else { return spec; }
   };
   
   
   // Determine data types and some stats.
-  Graphic.prototype.analyzeData = function(data, done) {
+  Graphic.prototype.parseData = function(data, spec, done) {
   
   };
   
@@ -113,7 +129,7 @@
   // with length > 0 where a type has not already been set.
   // Keys is an array of colnames that map to chart attributes.
   function mapValidTypes(data, keys, done) {
-    
+  
     function eachRow(row, next) {
       if (!_.isArray(keys)) { keys = [keys]; }
       async.each(keys, function(key, cb) { eachKey(key, row, cb); }, next);
@@ -197,7 +213,8 @@
   
   
   // Map Data to Components.
-  Graphic.prototype.mapData = function(done) {
+  Graphic.prototype.mapData = function(data, spec, done) {
+  
     this.yFacets    = [];
     this.xFacets    = [];
     this.facets     = [];
