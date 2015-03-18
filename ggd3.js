@@ -22,8 +22,16 @@
   
   var Graphic = function() {
     this.el = d3.select(document.createElement('div'));
+  
     this.stats = {};
     this.data = [];
+  
+    this.yFacets    = [];
+    this.xFacets    = [];
+    this.facets     = [];
+    this.groups     = [];
+    this.geometries = [];
+  
     this.applyData = function(data) { this.data = data; }
   };
   
@@ -34,26 +42,9 @@
     graphic.data = data || [];
     graphic.spec = graphic.configure(spec);
   
-    async.series([
-      function(cb) { graphic.parseData(data, spec, cb); },
-      
-      function(cb) { graphic.mapData(data, spec, function(err, mappings) {
-        graphic.mappings = mappings;
-        cb();
-      })},
-  
-      function(cb) { graphic.draw(data, spec, graphic.mappings, function(err, el) {
-        graphic.el = el
-      })}
-    ])
-  
-    graphic.parseData(graphic.data, graphic.spec, function(err) {
-  
-    })
-  
     if (done) {
       async.waterfall([
-        async.apply(graphic.analyzeData, graphic.data, graphic.spec),
+        async.apply(graphic.parseData, graphic.data, graphic.spec),
         async.apply(graphic.mapData, graphic.data, graphic.spec),
         async.apply(graphic.draw, graphic.data, graphic.spec, graphic.mappings)
       ], 
@@ -119,77 +110,135 @@
   };
   
   
-  // Determine data types and some stats.
+  // Determine data types and some stats. 
+  // TODO: add parseAsBool
+  // TODO: refactor for clarity.
   Graphic.prototype.parseData = function(data, spec, done) {
+    data = data || [];
+    spec = spec || {};
   
-  };
+    var parsedColumns = {};
+    var mappings = [
+      { name: 'x', type: spec.xType }
+    , { name: 'y', type: spec.yType }
+    , { name: 'color', type: spec.colorType }
+    , { name: 'size', type: spec.sizeType }
+    , { name: 'facet', type: spec.facetType }
+    , { name: 'facetX', type: spec.facetXType }
+    , { name: 'facetY', type: spec.facetYType }
+    ];
   
-  
-  // A dataType will have to be determined for every attribute/component
-  // with length > 0 where a type has not already been set.
-  // Keys is an array of colnames that map to chart attributes.
-  function mapValidTypes(data, keys, done) {
-  
-    function eachRow(row, next) {
-      if (!_.isArray(keys)) { keys = [keys]; }
-      async.each(keys, function(key, cb) { eachKey(key, row, cb); }, next);
-    }
-  
-    function eachKey(key, row, next) {
-      getValidTypes(key, function(err, validTypes) { 
-        row[key] = validTypes;
-        next();
+    // Parse, then add to parsedData to keep track of.
+    function parseAndAdd(colName, parseFunc, next) {
+      async.map(data, function(row, cb) { parseFunc(row[colName], cb); }
+      , function(err, res) {
+        if (err) { return next(err); }
+        parsedColumns[colName] = res;
+        next(null, res);
       });
     }
   
-    async.each(data, eachRow, done);
-  }
+    async.eachSeries(mappings, function(mapping, next) {
+      var colName = spec[mapping];
+  
+      // Check that the mapping is defined and has not already been parsed.
+      if (!colName || parsedColumns[colName]) { return next(); }
+  
+      // Then check whether the type has been set explicitly.
+      if (mapping.type === 'date') { return parseAndAdd(colName, parseAsDate, next); }
+      if (mapping.type === 'number') { return parseAndAdd(colName, parseAsNumber, next); }
+      if (mapping.type === 'string') { return parseAndAdd(colName, parseAsString, next); }
+  
+      // Otherwise we'll figure out the datatype for ourselves.
+      getColumnTypeAndParse(data, colName, function(err, res, type) {
+        if (err) { return next(err); }
+        spec[mapping + 'Type'] = type;
+        parsedColumns[colName] = res;
+        next();
+      });
+    }, 
+  
+    // Handle parsed data after eachSeries completes.
+    function(err) {
+      if (err) { return done(err); }
+  
+      var parsedData = [];
+      var columns = Object.keys(parsedColumns);
+  
+      // For each row of data.
+      var i = 0;
+      async.map(data, function(row, cb) {
+        var parsedRow = {};
+  
+        columns.forEach(function(colName) { 
+          parsedRow[colName] = parsedColumns[colName][i]; 
+        });
+  
+        parsedData.push(parsedRow);
+        i++;
+        cb(null, parsedRow);
+      }, done)
+  
+    });
+  };
   
   
-  // Returns object with parsed val for each type, undefined if unable to parse.
-  function getValidTypes(val, done) {
-    async.parallel([
-      async.apply(parseAsDate, val),
-      async.apply(parseAsNumber, val),
-      async.apply(parseAsString, val)
-    ],
+  function getColumnTypeAndParse(data, colName, done) {
   
-    function(err, res) {
-      done(err, { datetime: res[0], number: res[1], string: res[2] }) ;
+    function parseAsType(parseFunc, next) {
+      async.map(data, function(row, cb) { parseFunc(row[colName], cb); }, next)
+    }
+  
+    // Try first to parse as date, then as number, finally coerce to string.
+    parseAsType(parseAsDate, function(err, res) {
+      if (!err) { return done(null, res, 'date'); }
+  
+      parseAsType(parseAsNumber, function(err, res) {
+        if (!err) { return done(null, res, 'number'); }
+        parseAsType(parseAsString, function(err, res) { done(err, res, 'string'); });
+      });
+  
     });
   }
   
   
-  // Return a Date object or undefined if unable to parse.
   function parseAsDate(val, done) {
+    var parsed;
+  
     if (val instanceof Date) { return done(null, val); }
+    
+    // If value is falsey and nonzero, interpret as undefined.
+    if (!val && val!== 0) { return done(null, undefined); }
   
     // Attempt to parse val with given length and format.
     function tryParse(val, len, format) {
       var isValid = typeof val === 'string'
         && val.length === len 
-        && !!d3.time.format(format).parse(val);
+        && d3.time.format(format).parse(val);
       return isValid ? d3.time.format(format).parse(val) : false;
     }
   
-    var parsed = tryParse(val, 4, '%Y')
+    // TODO: add more valid date formats.
+    parsed = tryParse(val, 4, '%Y')
       || tryParse(val, 7,  '%Y-%m')
       || tryParse(val, 10, '%Y-%m-%d')
       || tryParse(val, 19, '%Y-%m-%d %H:%M:%S')
       || tryParse(val, 24, '%Y-%m-%dT%H:%M:%S.%LZ')
-      || undefined;
   
-    done(null, parsed);
+    if (parsed) { done(null, parsed); }
+    else { done(new Error('Failed to parse value as date.')); }
   }
   
   
-  // Return Number or false if unable to parse.
   function parseAsNumber(val, done) {
     var parsed;
   
     if (typeof val === 'number' && isFinite(val)) { done(null, val); }
   
-    // Match integers decimals.
+    // If value is falsey and nonzero, interpret as undefined.
+    else if (!val) { done(null, undefined); }
+  
+    // Match integers including decimals.
     else if (typeof val === 'string' && /^[-+]?([0-9]*\.[0-9]+|[0-9]+)$/.test(val)) {
       done(null, parseFloat(val));
     }
@@ -199,34 +248,29 @@
       done(null, parseFloat(val)/100);
     }
   
-    else { done(null, undefined); }
+    else { done(new Error('Failed to parse value as number.')); }
   }
   
   
-  // If val is NaN, undefined, empty, or null, return undefined.
-  // In all other cases cast as string.
+  // Convert any nonfalsey, nonzero value to string.
   function parseAsString(val, done) {
-    if (typeof val === 'string') { done(null, val); }
-    else if (!val && val !== 0 && val !== false) { done(null, undefined); }
-    else { done(null, String(val)); }
+    if (!val && val!== 0) { return done(null, undefined); }
+    done(null, String(val));
   }
+  
   
   
   // Map Data to Components.
   Graphic.prototype.mapData = function(data, spec, done) {
-  
-    this.yFacets    = [];
-    this.xFacets    = [];
-    this.facets     = [];
-    this.groups     = [];
-    this.geometries = [];
+    spec = spec || {};
+    data = data || [];
   
     // Unless facets are floated or independent, get min and max here.
-    if (!this.spec.independentAxes && !this.spec.floatFacetScaleY) {
-      var yExtent = d3.extent(this.data, function(row) { return row[that.spec.y]; });
+    if (!spec.independentAxes && !spec.floatFacetScaleY) {
+      var yExtent = d3.extent(data, function(row) { return row[spec.y]; });
     }
   
-    mapYFacets.call(this, this.data, function() { 
+    mapYFacets.call(this, data, function() {
       if (done) { done(); } 
     });
   };
@@ -245,8 +289,8 @@
   
   
   function mapYFacets(data, done) {
-    var that      = this;
-    var key       = this.spec.facetY;
+    var that = this;
+    var key = this.spec.facetY;
   
     nest(data, key, function(nested, cb) {
       var yFacet = { key: key, value: nested.key };
@@ -318,6 +362,8 @@
   function mapGeometries(data, done) {
     var that = this;
     var key  = this.spec.geometry;
+    console.log('!!!!!!!')
+    console.log(data)
     
     nest(data, key, function(nested, cb) {
       that.geometries.push(nested.values);
@@ -357,7 +403,7 @@
   // Y facets divide the svg horizontally. Each facet gets an
   // equal share of the canvas.
   Graphic.prototype.drawFacetY = function(svg, width, height) {
-    var facetHeight = height / (this.facetY.length || 1);
+    var facetHeight = height / (this.yFacets.length || 1);
   
     // Even if y facets aren't defined we still want to create
     // an element for them (to hold x & flow facets). If data
@@ -388,7 +434,7 @@
   // X facets divide each Y facet vertically. Each x facet gets
   // an equal share of each y facet.
   Graphic.prototype.drawFacetX = function(facetY, width, height) {
-    var facetWidth = width / (this.facetX.length || 1);
+    var facetWidth = width / (this.xFacets.length || 1);
   
     var data = this.facetX;
     if (_.isEmpty(data)) { data = [{}]; }
@@ -410,7 +456,7 @@
   // Flow facets (elsewhere just called "facets") divide up the canvas
   // as evenly as possible.
   Graphic.prototype.drawFacetFlow = function(facetX, width, height) {
-    var numFacets = this.facet.length || 1;
+    var numFacets = this.facets.length || 1;
   
     // To calculate best fit, first we have to determine the ratio
     // of width:height to use for each facet.
@@ -471,7 +517,7 @@
     height = height || parseInt(group.style('height'));
   
     d3.selectAll(group).each(function(datum, index) {
-      var data = that.geometry[index];
+      var data = that.geometries[index] || [];
       var selection = d3.selectAll(this);
   
       selection.selectAll('circle.point')
