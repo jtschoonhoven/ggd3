@@ -1,10 +1,4 @@
-
-// ===========
-// NODE CONFIG
-// ===========
-
 if (typeof module !== 'undefined' && module.exports) {
-
   async = require('async');
   d3    = require('d3');
   _     = require('underscore');
@@ -18,7 +12,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   // Copy HTML from test.html and write to fake DOM.
   var html = fs.readFileSync('./test/test.html', { encoding: 'utf8' });
-  d3.select('html').html(html);
+  // d3.select('html').html(html);
 }
 
 var expect = chai.expect;
@@ -75,7 +69,7 @@ describe('', function() {
     var data = [{ country: 'AA', units: 1 }, { country: 'BB', units: 2 }];
     var graphic = ggd3.create(spec, data, function(err, res) {
       console.log(graphic.el.html());
-      done()
+      done();
     });
   });
 

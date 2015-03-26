@@ -44,15 +44,16 @@
   
     if (done) {
       async.waterfall([
-        async.apply(graphic.parseData, graphic.data, graphic.spec),
-        async.apply(graphic.mapData, graphic.data, graphic.spec),
-        async.apply(graphic.draw, graphic.data, graphic.spec, graphic.mappings)
+        async.apply(graphic.parseData.bind(graphic), graphic.data, graphic.spec),
+        async.apply(graphic.mapData.bind(graphic), graphic.data),
+        async.apply(graphic.draw.bind(graphic), graphic.spec.el, graphic.spec.width, graphic.spec.height)
       ], 
       done);
     }
   
     else { return graphic; }
   };
+  
   
   
   ggd3.defaults = {
@@ -362,8 +363,6 @@
   function mapGeometries(data, done) {
     var that = this;
     var key  = this.spec.geometry;
-    console.log('!!!!!!!')
-    console.log(data)
     
     nest(data, key, function(nested, cb) {
       that.geometries.push(nested.values);
@@ -371,6 +370,7 @@
     }, 
     done);
   }
+  
   
   
   
@@ -383,7 +383,7 @@
     if (height) { this.spec.height = height; }
   
     var noDimensions = (!el && (!width && !height));
-    if (noDimensions) { throw Error('An element or height & width must be specified.'); }
+    if (noDimensions) { throw Error('Cannot draw SVG without an element or height & width must specified.'); }
   
     if (this.spec.el) { el = d3.select(this.spec.el); }
     width = this.spec.width   || parseInt(el.style('width'));
